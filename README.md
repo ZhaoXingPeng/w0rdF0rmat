@@ -12,3 +12,14 @@
 - 🔧 自定义格式要求
 
 ## 项目结构 
+src/
+├── core/
+│ ├── ai_assistant.py # AI助手，用于分析文档内容和提供格式建议
+│ ├── document.py # 文档处理类，负责读取和解析.docx文件
+│ ├── format_spec.py # 格式规范解析类，加载和解析格式模板
+│ ├── formatter.py # 格式化类，应用格式规范到文档
+│ └── presets/
+│ └── default.yaml # 默认格式设置
+├── utils/
+│ └── helpers.py # 辅助函数，验证文件路径和获取文件扩展名
+└── main.py # 程序入口，示例用法
