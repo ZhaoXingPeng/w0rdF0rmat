@@ -27,7 +27,7 @@ class DocumentAI:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "你是一个专业的学术论文结构分析助手。"},
                     {"role": "user", "content": prompt.format(text=text)}
@@ -56,7 +56,7 @@ class DocumentAI:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "你是一个专业的学术论文格式专家。"},
                     {"role": "user", "content": prompt}
