@@ -1,1 +1,2 @@
- 
+python-docx>=0.8.11
+python-docx-template>=0.3.0 
