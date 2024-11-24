@@ -9,17 +9,19 @@ class Document:
     def __init__(self, path):
         self.path = path
         self.doc = DocxDocument(path)  # 读取路径中的 .docx 文档
-        self.ai_assistant = DocumentAI()  # 创建 AI 分析助手
         # 存储论文的各部分内容
         self.title = None
         self.abstract = None
         self.keywords = None
         self.sections = {}
+        self.ai_assistant = None  # 不立即创建 AI 分析助手
+        
         # 先尝试通过文档样式来解析
         if not self._parse_by_styles():
             # 如果样式解析失败，试试使用传统方法
             if not self._parse_document_traditional():
                 # 如果传统方法也失败，最后使用 AI 分析
+                self.ai_assistant = DocumentAI()  # 只有在需要时才创建 AI 助手
                 self._parse_with_ai()
 
     def _parse_by_styles(self) -> bool:

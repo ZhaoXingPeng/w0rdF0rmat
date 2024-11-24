@@ -3,7 +3,7 @@ from src.core.document import Document
 
 def main():
     # 示例用法
-    doc = Document("input.docx")
+    doc = Document("./src/test/test.docx")
     formatter = WordFormatter(doc)
     
     # 使用预设格式

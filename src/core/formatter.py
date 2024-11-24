@@ -29,9 +29,19 @@ class WordFormatter:
     def apply_user_requirements(self, requirements: str):
         """
         应用用户提供的格式要求
+        如果没有提供要求，则使用本地样式进行格式化
         """
-        format_spec = self.format_parser.parse_user_requirements(requirements)
-        self.apply_format_spec(format_spec)
+        if requirements.strip():
+            format_spec = self.format_parser.parse_user_requirements(requirements)
+            self.apply_format_spec(format_spec)
+        else:
+            # 如果没有用户要求，直接使用本地样式
+            doc_format = self.format_parser.parse_document_styles(self.document)
+            if doc_format:
+                self.apply_format_spec(doc_format)
+            else:
+                # 使用默认格式
+                self.apply_format_spec(self.format_parser.get_default_format())
     
     def _apply_section_format(self, paragraph, section_format):
         """
@@ -130,4 +140,5 @@ class WordFormatter:
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
-                        self._apply_section_format(paragraph, self.format_spec.body)  # 假设表格内容使用正文格式 
+                        self._apply_section_format(paragraph, self.format_spec.body)  # 假设表格内容使用正文格式
+    

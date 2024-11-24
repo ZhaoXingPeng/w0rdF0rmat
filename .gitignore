@@ -34,3 +34,5 @@ ENV/
 # Output files
 output/
 *.docx
+
+test/
