@@ -6,7 +6,18 @@ class WordFormatter:
     def __init__(self, document, format_spec: DocumentFormat = None):
         self.document = document
         self.format_parser = FormatSpecParser()
-        self.format_spec = format_spec or self.format_parser.get_default_format()
+        
+        # 优先使用传入的格式规范
+        if format_spec:
+            self.format_spec = format_spec
+        else:
+            # 尝试从文档现有样式创建格式规范
+            doc_format = self.format_parser.parse_document_styles(document)
+            if doc_format:
+                self.format_spec = doc_format
+            else:
+                # 使用默认格式
+                self.format_spec = self.format_parser.get_default_format()
     
     def apply_format_spec(self, format_spec: DocumentFormat):
         """

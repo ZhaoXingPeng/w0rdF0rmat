@@ -132,3 +132,62 @@ class FormatSpecParser:
             references=SectionFormat(font_size=10.5, first_line_indent=-24),
             page_margin={"top": 1.0, "bottom": 1.0, "left": 1.25, "right": 1.25}
         ) 
+    
+    def parse_document_styles(self, document) -> Optional[DocumentFormat]:
+        """
+        尝试从文档现有样式创建格式规范
+        """
+        try:
+            # 获取文档中使用的样式
+            styles = {}
+            for para in document.doc.paragraphs:
+                if para.style and para.text.strip():
+                    style = para.style
+                    styles[style.name] = {
+                        'font_size': style.font.size.pt if style.font.size else 12,
+                        'font_name': style.font.name if style.font.name else "Times New Roman",
+                        'bold': style.font.bold if style.font.bold else False,
+                        'italic': style.font.italic if style.font.italic else False,
+                        'alignment': self._get_alignment_name(para.alignment),
+                        'first_line_indent': para.paragraph_format.first_line_indent.pt if para.paragraph_format.first_line_indent else 0,
+                        'line_spacing': para.paragraph_format.line_spacing if para.paragraph_format.line_spacing else 1.0,
+                        'space_before': para.paragraph_format.space_before.pt if para.paragraph_format.space_before else 0,
+                        'space_after': para.paragraph_format.space_after.pt if para.paragraph_format.space_after else 0
+                    }
+            
+            if styles:
+                return self._create_format_from_styles(styles)
+            return None
+            
+        except Exception as e:
+            print(f"解析文档样式时出错: {str(e)}")
+            return None
+    
+    def _create_format_from_styles(self, styles: Dict) -> DocumentFormat:
+        """
+        从样式字典创建格式规范
+        """
+        # 映射样式到文档部分
+        title_style = next((s for name, s in styles.items() if 'title' in name.lower()), None)
+        abstract_style = next((s for name, s in styles.items() if 'abstract' in name.lower()), None)
+        # ... 其他部分类似
+        
+        return DocumentFormat(
+            title=SectionFormat(**(title_style or self._get_fallback_format().title.__dict__)),
+            abstract=SectionFormat(**(abstract_style or self._get_fallback_format().abstract.__dict__)),
+            # ... 其他部分类似
+        )
+    
+    def _get_alignment_name(self, alignment) -> str:
+        """
+        将对齐方式转换为字符串
+        """
+        alignment_map = {
+            0: "LEFT",
+            1: "CENTER",
+            2: "RIGHT",
+            3: "JUSTIFY"
+        }
+        return alignment_map.get(alignment, "LEFT")
+    
+    # ... 其他方法保持不变 ... 
