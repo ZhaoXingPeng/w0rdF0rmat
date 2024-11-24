@@ -1,0 +1,23 @@
+title:
+  font_size: 16
+  font_name: "Times New Roman"
+  bold: true
+  italic: false
+  alignment: "CENTER"
+  first_line_indent: 0
+  line_spacing: 1.0
+  space_before: 0
+  space_after: 12
+
+abstract:
+  font_size: 12
+  font_name: "Times New Roman"
+  bold: false
+  italic: false
+  alignment: "JUSTIFY"
+  first_line_indent: 24
+  line_spacing: 1.0
+  space_before: 12
+  space_after: 12
+
+# ... 其他部分的格式定义 ... 
