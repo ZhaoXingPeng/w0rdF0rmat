@@ -63,11 +63,15 @@ class WordFormatter:
         """
         实现文档格式化的主要逻辑
         """
-        self.format_title()
-        self.format_abstract()
-        self.format_keywords()
-        self.format_sections()
-        self.format_references()
+        try:
+            self.format_title()
+            self.format_abstract()
+            self.format_keywords()
+            self.format_sections()
+            self.format_references()
+            self.format_tables()  # 添加对表格的格式化支持
+        except Exception as e:
+            print(f"格式化过程中出错: {str(e)}")
     
     def format_title(self):
         """
@@ -117,14 +121,13 @@ class WordFormatter:
         for ref in references:
             self._apply_section_format(ref, self.format_spec.references)
     
-    def format_paragraphs(self):
-        """
-        段落格式化
-        """
-        pass
-    
     def format_tables(self):
         """
-        表格格式化
+        格式化表格
         """
-        pass 
+        tables = self.document.get_tables()
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        self._apply_section_format(paragraph, self.format_spec.body)  # 假设表格内容使用正文格式 
