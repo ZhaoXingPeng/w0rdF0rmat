@@ -1,11 +1,13 @@
 from docx import Document as DocxDocument
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from .ai_assistant import DocumentAI
 
 class Document:
     def __init__(self, path):
         self.path = path
         self.doc = DocxDocument(path)
+        self.ai_assistant = DocumentAI()
         # 存储论文各部分内容
         self.title = None
         self.abstract = None
@@ -14,6 +16,55 @@ class Document:
         self._parse_document()
     
     def _parse_document(self):
+        """
+        使用AI辅助解析文档结构
+        """
+        # 获取完整文档文本
+        full_text = "\n".join([para.text for para in self.doc.paragraphs])
+        
+        # 使用AI分析文档结构
+        ai_analysis = self.ai_assistant.analyze_document(full_text)
+        if ai_analysis:
+            # 根据AI分析结果更新文档结构
+            self._update_structure_from_ai(ai_analysis)
+        else:
+            # 如果AI分析失败，使用原有的解析方法
+            self._parse_document_traditional()
+    
+    def _update_structure_from_ai(self, ai_analysis):
+        """
+        根据AI分析结果更新文档结构
+        """
+        try:
+            import json
+            structure = json.loads(ai_analysis)
+            
+            # 更新文档各部分
+            for para in self.doc.paragraphs:
+                text = para.text.strip()
+                
+                # 根据AI识别结果匹配段落
+                if text == structure.get('title'):
+                    self.title = para
+                elif text == structure.get('abstract'):
+                    self.abstract = para
+                elif text == structure.get('keywords'):
+                    self.keywords = para
+                
+                # 处理章节
+                for section in structure.get('sections', []):
+                    if text == section['title']:
+                        self.sections[text] = []
+                        current_section = text
+                    elif current_section:
+                        self.sections[current_section].append(para)
+                
+        except Exception as e:
+            print(f"解析AI结果时出错: {str(e)}")
+            # 失败时使用传统方法解析
+            self._parse_document_traditional()
+    
+    def _parse_document_traditional(self):
         """
         解析文档，识别论文各个部分
         """
@@ -86,3 +137,18 @@ class Document:
         获取所有表格
         """
         return self.doc.tables 
+    
+    def get_ai_format_suggestions(self, section_type):
+        """
+        获取AI对特定部分的格式建议
+        """
+        content = None
+        if section_type == 'title':
+            content = self.title.text if self.title else None
+        elif section_type == 'abstract':
+            content = self.abstract.text if self.abstract else None
+        # ... 其他部分类似
+        
+        if content:
+            return self.ai_assistant.suggest_formatting(section_type, content)
+        return None
