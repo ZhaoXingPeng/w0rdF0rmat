@@ -3,7 +3,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import json
 from typing import Optional, Dict, Any
-from config.config_manager import ConfigManager
+from ..config.config_manager import ConfigManager
 
 class DocumentAI:
     def __init__(self, config_manager: ConfigManager):

@@ -32,6 +32,26 @@ class FormatSpecParser:
         self.preset_formats = {}
         self._load_preset_formats()
     
+    def _load_preset_formats(self) -> None:
+        """
+        加载预设的格式模板
+        """
+        preset_path = Path(__file__).parent / "presets"
+        
+        if preset_path.exists():
+            for format_file in preset_path.glob("*.yaml"):
+                try:
+                    with open(format_file, 'r', encoding='utf-8') as f:
+                        format_data = yaml.safe_load(f)
+                        self.preset_formats[format_file.stem] = self._parse_format_data(format_data)
+                except Exception as e:
+                    print(f"加载预设格式 {format_file.name} 失败: {str(e)}")
+                    continue
+        
+        # 如果没有成功加载任何预设格式，使用后备格式
+        if not self.preset_formats:
+            self.preset_formats['default'] = self._get_fallback_format()
+    
     def parse_format_file(self, file_path: str) -> Optional[DocumentFormat]:
         """
         解析格式文件（支持YAML和JSON）
@@ -70,7 +90,7 @@ class FormatSpecParser:
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")
-            return self.get_default_format()
+            return self._get_fallback_format()
     
     def parse_user_requirements(self, requirements: str) -> DocumentFormat:
         """
