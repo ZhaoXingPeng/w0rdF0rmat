@@ -42,6 +42,18 @@ class TableFormat:
             }
 
 @dataclass
+class ImageFormat:
+    """图片格式定义"""
+    width: float = None  # 宽度（磅值），None表示保持原始大小
+    height: float = None  # 高度（磅值），None表示保持原始大小
+    alignment: str = "CENTER"  # 对齐方式
+    caption_font_size: float = 10.5  # 图注字号
+    caption_font_name: str = "Times New Roman"  # 图注字体
+    caption_alignment: str = "CENTER"  # 图注对齐方式
+    space_before: float = 12  # 图片前间距
+    space_after: float = 12  # 图片后间距
+
+@dataclass
 class DocumentFormat:
     title: SectionFormat
     abstract: SectionFormat
@@ -52,10 +64,13 @@ class DocumentFormat:
     references: SectionFormat
     page_margin: Dict[str, float]
     tables: TableFormat = None
+    images: ImageFormat = None
 
     def __post_init__(self):
         if self.tables is None:
             self.tables = TableFormat()
+        if self.images is None:
+            self.images = ImageFormat()
 
 class FormatSpecParser:
     def __init__(self):
@@ -117,7 +132,8 @@ class FormatSpecParser:
                     "left": 1.25,
                     "right": 1.25
                 }),
-                tables=TableFormat(**data.get('tables', {}))
+                tables=TableFormat(**data.get('tables', {})),
+                images=ImageFormat(**data.get('images', {}))
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")
@@ -197,7 +213,8 @@ class FormatSpecParser:
             body=SectionFormat(font_size=12, first_line_indent=24, line_spacing=1.5),
             references=SectionFormat(font_size=10.5, first_line_indent=-24),
             page_margin={"top": 1.0, "bottom": 1.0, "left": 1.25, "right": 1.25},
-            tables=TableFormat()
+            tables=TableFormat(),
+            images=ImageFormat()
         ) 
     
     def parse_document_styles(self, document) -> Optional[DocumentFormat]:

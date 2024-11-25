@@ -117,4 +117,7 @@ class ConfigManager:
         if not self.config["formatting"]["use_default_template"] and \
            self.config["formatting"]["user_template_path"]:
             return self.config["formatting"]["user_template_path"]
-        return self.config["formatting"]["template_path"] 
+        
+        # 使用绝对路径
+        default_path = Path(__file__).parent.parent / "core" / "presets" / "default.yaml"
+        return str(default_path) 

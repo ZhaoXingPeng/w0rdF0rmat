@@ -86,6 +86,7 @@ class WordFormatter:
             self.format_sections()
             self.format_references()
             self.format_tables()
+            self.format_images()
         except Exception as e:
             print(f"格式化过程中出错: {str(e)}")
     
@@ -169,28 +170,61 @@ class WordFormatter:
 
     def _apply_three_line_style(self, table):
         """应用三线表样式"""
-        # 清除所有边框
-        self._clear_table_borders(table)
-        
-        # 设置表格整体格式
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.allow_autofit = True
-        
-        # 添加三条主要横线
-        self._set_row_border(table.rows[0], "top", True)      # 顶线
-        self._set_row_border(table.rows[0], "bottom", True)   # 表头下横线
-        self._set_row_border(table.rows[-1], "bottom", True)  # 底线
-        
-        # 设置单元格格式
-        for i, row in enumerate(table.rows):
-            for cell in row.cells:
-                # 设置单元格文字格式
-                self._format_table_cell(cell, 
-                    bold=(i == 0),  # 表头加粗
-                    font_size=self.format_spec.tables.font_size,
-                    font_name=self.format_spec.tables.font_name,
-                    alignment="CENTER" if i == 0 else "LEFT"
-                )
+        try:
+            # 设置表格整体格式
+            table.style = 'Table Grid'
+            table.autofit = True
+            
+            # 先清除所有边框
+            for row in table.rows:
+                for cell in row.cells:
+                    for side in ['top', 'left', 'bottom', 'right']:
+                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_top()
+                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_left()
+                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
+                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_right()
+            
+            # 添加三条主要横线
+            # 顶线
+            for cell in table.rows[0].cells:
+                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_top()
+                border.set('val', 'single')
+                border.set('sz', '12')
+            
+            # 表头下横线
+            for cell in table.rows[0].cells:
+                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
+                border.set('val', 'single')
+                border.set('sz', '12')
+            
+            # 底线
+            for cell in table.rows[-1].cells:
+                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
+                border.set('val', 'single')
+                border.set('sz', '12')
+            
+            # 设置单元格格式
+            for i, row in enumerate(table.rows):
+                for cell in row.cells:
+                    # 创建新的段落运行
+                    paragraph = cell.paragraphs[0]
+                    paragraph.clear()  # 清除现有内容
+                    run = paragraph.add_run(cell.text.strip())
+                    
+                    # 设置字体格式
+                    run.font.size = Pt(self.format_spec.tables.font_size)
+                    run.font.name = self.format_spec.tables.font_name
+                    
+                    # 表头加粗
+                    if i == 0:
+                        run.font.bold = True
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    else:
+                        run.font.bold = False
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+                    
+        except Exception as e:
+            print(f"应用三线表样式时出错: {str(e)}")
 
     def _apply_grid_style(self, table):
         """应用网格表样式"""
@@ -231,14 +265,20 @@ class WordFormatter:
     def _format_table_cell(self, cell, bold=False, font_size=10.5, 
                           font_name="Times New Roman", alignment="LEFT"):
         """设置单元格格式"""
+        # 清除现有内容并重新创建
         paragraph = cell.paragraphs[0]
-        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.__dict__[alignment]
+        text = paragraph.text
+        paragraph.clear()
+        run = paragraph.add_run(text)
         
-        # 设置单元格文字格式
-        run = paragraph.runs[0] if paragraph.runs else paragraph.add_run()
+        # 设置字体格式
         run.font.size = Pt(font_size)
         run.font.name = font_name
         run.font.bold = bold
+        
+        # 设置对齐方式
+        if alignment in WD_PARAGRAPH_ALIGNMENT.__members__:
+            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.__members__[alignment]
 
     def _clear_table_borders(self, table):
         """清除表格所有边框"""
@@ -250,9 +290,10 @@ class WordFormatter:
     def _set_row_border(self, row, border_position, enabled):
         """设置行的边框"""
         for cell in row.cells:
-            cell._tc.get_or_add_tcPr().xpath('./w:tcBorders/*')
-            border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders()
-            setattr(border, f"get_or_add_{border_position}_border()", enabled)
+            tcPr = cell._tc.get_or_add_tcPr()
+            tcBorders = tcPr.get_or_add_tcBorders()
+            border = getattr(tcBorders, f"get_or_add_{border_position}")()
+            border.val = 'single' if enabled else 'nil'
 
     def _set_outer_borders(self, table):
         """设置表格外边框"""
@@ -273,6 +314,80 @@ class WordFormatter:
         """设置单元格边框"""
         tcPr = cell._tc.get_or_add_tcPr()
         tcBorders = tcPr.get_or_add_tcBorders()
-        border = getattr(tcBorders, f"get_or_add_{border_position}_border()")
-        border.val = 'single' if enabled else 'none'
+        border = getattr(tcBorders, f"get_or_add_{border_position}")()
+        border.val = 'single' if enabled else 'nil'
+    
+    def format_images(self):
+        """格式化文档中的所有图片"""
+        for paragraph in self.document.doc.paragraphs:
+            for run in paragraph.runs:
+                if run._r.xml.find('.//w:drawing') != -1:  # 检查是否包含图片
+                    self._format_image_paragraph(paragraph)
+                    # 检查下一段是否为图注
+                    next_para = self._get_next_paragraph(paragraph)
+                    if next_para and self._is_image_caption(next_para):
+                        self._format_image_caption(next_para)
+
+    def _format_image_paragraph(self, paragraph):
+        """格式化包含图片的段落"""
+        # 设置图片段落的对齐方式
+        alignment_map = {
+            "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        paragraph.alignment = alignment_map.get(
+            self.format_spec.images.alignment, 
+            WD_PARAGRAPH_ALIGNMENT.CENTER
+        )
+        
+        # 设置段落间距
+        paragraph.paragraph_format.space_before = Pt(self.format_spec.images.space_before)
+        paragraph.paragraph_format.space_after = Pt(self.format_spec.images.space_after)
+        
+        # 调整图片大小（如果指定了大小）
+        for run in paragraph.runs:
+            if run._r.xml.find('.//w:drawing') != -1:
+                drawing = run._r.xpath('.//w:drawing')[0]
+                if self.format_spec.images.width:
+                    # 设置图片宽度
+                    extent = drawing.xpath('.//wp:extent')[0]
+                    extent.set('cx', str(int(self.format_spec.images.width * 360000)))
+                if self.format_spec.images.height:
+                    # 设置图片高度
+                    extent = drawing.xpath('.//wp:extent')[0]
+                    extent.set('cy', str(int(self.format_spec.images.height * 360000)))
+
+    def _format_image_caption(self, paragraph):
+        """格式化图注"""
+        # 设置图注格式
+        alignment_map = {
+            "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        paragraph.alignment = alignment_map.get(
+            self.format_spec.images.caption_alignment,
+            WD_PARAGRAPH_ALIGNMENT.CENTER
+        )
+        
+        for run in paragraph.runs:
+            run.font.size = Pt(self.format_spec.images.caption_font_size)
+            run.font.name = self.format_spec.images.caption_font_name
+
+    def _get_next_paragraph(self, paragraph):
+        """获取下一个段落"""
+        paragraphs = list(self.document.doc.paragraphs)
+        try:
+            current_index = paragraphs.index(paragraph)
+            if current_index < len(paragraphs) - 1:
+                return paragraphs[current_index + 1]
+        except ValueError:
+            pass
+        return None
+
+    def _is_image_caption(self, paragraph):
+        """判断段落是否为图注"""
+        text = paragraph.text.strip().lower()
+        return text.startswith('图') or text.startswith('fig')
     

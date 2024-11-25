@@ -81,4 +81,30 @@ page_margin:
   left: 1.25
   right: 1.25
 
+tables:
+  style: "DEFAULT"
+  font_size: 10.5
+  font_name: "Times New Roman"
+  alignment: "CENTER"
+  header_bold: true
+  row_height: 12
+  col_width: 100
+  cell_padding: 2
+  line_spacing: 1.0
+  borders:
+    top: true
+    bottom: true
+    left: true
+    right: true
+    inside_h: true
+    inside_v: true
+
+images:
+  alignment: "CENTER"
+  caption_font_size: 10.5
+  caption_font_name: "Times New Roman"
+  caption_alignment: "CENTER"
+  space_before: 12
+  space_after: 12
+
 # ... 其他部分的格式定义 ... 
