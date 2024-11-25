@@ -17,6 +17,31 @@ class SectionFormat:
     space_after: float = 0
 
 @dataclass
+class TableFormat:
+    """表格格式定义"""
+    style: str = "DEFAULT"  # 表格样式：DEFAULT, THREE_LINE, GRID
+    font_size: float = 10.5
+    font_name: str = "Times New Roman"
+    alignment: str = "CENTER"
+    header_bold: bool = True
+    row_height: float = 12  # 行高（磅值）
+    col_width: float = 100  # 默认列宽（磅值）
+    cell_padding: float = 2  # 单元格内边距（磅值）
+    line_spacing: float = 1.0  # 单元格内行距
+    borders: Dict[str, bool] = None  # 边框设置
+
+    def __post_init__(self):
+        if self.borders is None:
+            self.borders = {
+                "top": True,
+                "bottom": True,
+                "left": True,
+                "right": True,
+                "inside_h": True,
+                "inside_v": True
+            }
+
+@dataclass
 class DocumentFormat:
     title: SectionFormat
     abstract: SectionFormat
@@ -26,7 +51,12 @@ class DocumentFormat:
     body: SectionFormat
     references: SectionFormat
     page_margin: Dict[str, float]
-    
+    tables: TableFormat = None
+
+    def __post_init__(self):
+        if self.tables is None:
+            self.tables = TableFormat()
+
 class FormatSpecParser:
     def __init__(self):
         self.preset_formats = {}
@@ -86,7 +116,8 @@ class FormatSpecParser:
                     "bottom": 1.0,
                     "left": 1.25,
                     "right": 1.25
-                })
+                }),
+                tables=TableFormat(**data.get('tables', {}))
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")
@@ -165,7 +196,8 @@ class FormatSpecParser:
             heading2=SectionFormat(font_size=13, bold=True),
             body=SectionFormat(font_size=12, first_line_indent=24, line_spacing=1.5),
             references=SectionFormat(font_size=10.5, first_line_indent=-24),
-            page_margin={"top": 1.0, "bottom": 1.0, "left": 1.25, "right": 1.25}
+            page_margin={"top": 1.0, "bottom": 1.0, "left": 1.25, "right": 1.25},
+            tables=TableFormat()
         ) 
     
     def parse_document_styles(self, document) -> Optional[DocumentFormat]:

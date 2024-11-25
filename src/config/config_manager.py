@@ -1,12 +1,52 @@
 import yaml
 import os
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 class ConfigManager:
-    def __init__(self, config_path: str = "src/config/config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        """
+        初始化配置管理器
+        Args:
+            config_path: 配置文件路径，如果为None则使用默认路径
+        """
+        if config_path is None:
+            # 使用相对于当前文件的路径
+            self.config_path = Path(__file__).parent / "config.yaml"
+        else:
+            self.config_path = Path(config_path)
+            
+        # 确保配置文件存在
+        if not self.config_path.exists():
+            self._create_default_config()
+            
         self.config = self._load_config()
+    
+    def _create_default_config(self):
+        """创建默认配置文件"""
+        default_config = {
+            "ai_assistant": {
+                "enabled": False,
+                "model": "gpt-3.5-turbo"
+            },
+            "formatting": {
+                "use_default_template": True,
+                "template_path": str(Path(__file__).parent.parent / "core" / "presets" / "default.yaml"),
+                "user_template_path": None
+            }
+        }
         
+        try:
+            # 确保目录存在
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 写入默认配置
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(default_config, f, allow_unicode=True)
+            print(f"已创建默认配置文件: {self.config_path}")
+        except Exception as e:
+            print(f"创建默认配置文件失败: {str(e)}")
+            
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
         try:
@@ -25,7 +65,7 @@ class ConfigManager:
             },
             "formatting": {
                 "use_default_template": True,
-                "template_path": "src/core/presets/default.yaml",
+                "template_path": str(Path(__file__).parent.parent / "core" / "presets" / "default.yaml"),
                 "user_template_path": None
             }
         }
@@ -39,16 +79,19 @@ class ConfigManager:
         Returns:
             保存的文件路径
         """
-        template_path = os.path.join(project_path, "format_template.json")
+        template_path = Path(project_path) / "format_template.json"
         try:
+            # 确保目录存在
+            template_path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(template_path, 'w', encoding='utf-8') as f:
                 json.dump(template, f, indent=2, ensure_ascii=False)
             
             # 更新配置
-            self.config["formatting"]["user_template_path"] = template_path
+            self.config["formatting"]["user_template_path"] = str(template_path)
             self.save_config()
             
-            return template_path
+            return str(template_path)
         except Exception as e:
             print(f"保存用户模板失败: {str(e)}")
             return None

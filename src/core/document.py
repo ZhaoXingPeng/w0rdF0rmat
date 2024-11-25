@@ -196,23 +196,32 @@ class Document:
 
     def get_references(self):
         """获取参考文献部分"""
+        references = []
         for section_name, paragraphs in self.sections.items():
             if '参考文献' in section_name or 'references' in section_name.lower():
-                return paragraphs
-        return []
+                references.extend(paragraphs)
+        return references
 
-    def save(self, output_path):
-        """保存文档"""
-        self.doc.save(output_path)
+    def get_tables(self):
+        """获取所有表格"""
+        return self.doc.tables
+
+    def save(self, output_path: str):
+        """
+        保存文档
+        Args:
+            output_path: 输出文件路径
+        """
+        try:
+            self.doc.save(output_path)
+            print(f"文档已保存至: {output_path}")
+        except Exception as e:
+            print(f"保存文档失败: {str(e)}")
 
     def get_paragraphs(self):
         """获取所有段落"""
         return self.doc.paragraphs
 
-    def get_tables(self):
-        """获取所有表格"""
-        return self.doc.tables
-    
     def get_ai_format_suggestions(self, section_type):
         """获取AI对特定部分的格式建议
         """
