@@ -1,1 +1,10 @@
- 
+# 全局配置
+ai_assistant:
+  enabled: false  # 是否启用AI辅助功能
+  model: "gpt-3.5-turbo"  # 使用的AI模型
+
+# 格式化配置
+formatting:
+  use_default_template: true  # 是否使用默认模板
+  template_path: "src/core/presets/default.yaml"  # 默认模板路径
+  user_template_path: null  # 用户自定义模板路径 

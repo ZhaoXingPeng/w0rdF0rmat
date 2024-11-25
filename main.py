@@ -1,33 +1,29 @@
+from src.config.config_manager import ConfigManager
 from src.core.formatter import WordFormatter
 from src.core.document import Document
 
 def main():
-    # 示例用法
-    doc = Document("./src/test/test.docx")
-    formatter = WordFormatter(doc)
-    
-    # 使用预设格式
-    formatter.format()
-    
-    # 或者使用用户提供的格式要求
-    user_requirements = """
-    标题要求：
-    - 三号字（16pt）
-    - 黑体
-    - 居中
-    
-    正文要求：
-    - 小四号字（12pt）
-    - 首行缩进2字符
-    - 1.5倍行距
-    
-    参考文献：
-    - 五号字（10.5pt）
-    - 悬挂缩进
-    """
-    formatter.apply_user_requirements(user_requirements)
-    
-    doc.save("output.docx")
+    try:
+        # 加载配置
+        config_manager = ConfigManager()
+        
+        # 读取测试文档
+        doc = Document("./test/test.docx")
+        
+        # 创建格式化器并使用默认格式
+        formatter = WordFormatter(doc, config_manager)
+        
+        # 应用默认格式
+        formatter.format()
+        
+        # 保存格式化后的文档
+        doc.save("./test/output.docx")
+        print("文档格式化完成，已保存为 output.docx")
+        
+    except FileNotFoundError:
+        print("错误：找不到测试文档 test.docx")
+    except Exception as e:
+        print(f"错误：格式化过程中出现异常 - {str(e)}")
 
 if __name__ == "__main__":
     main() 

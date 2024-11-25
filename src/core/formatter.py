@@ -3,21 +3,18 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from .format_spec import FormatSpecParser, DocumentFormat
 
 class WordFormatter:
-    def __init__(self, document, format_spec: DocumentFormat = None):
+    def __init__(self, document, config_manager):
         self.document = document
+        self.config_manager = config_manager
         self.format_parser = FormatSpecParser()
         
-        # 优先使用传入的格式规范
-        if format_spec:
-            self.format_spec = format_spec
-        else:
-            # 尝试从文档现有样式创建格式规范
-            doc_format = self.format_parser.parse_document_styles(document)
-            if doc_format:
-                self.format_spec = doc_format
-            else:
-                # 使用默认格式
-                self.format_spec = self.format_parser.get_default_format()
+        # 获取格式规范
+        template_path = self.config_manager.get_template_path()
+        self.format_spec = self.format_parser.parse_format_file(template_path)
+        
+        if not self.format_spec:
+            # 如果无法加载模板，使用默认格式
+            self.format_spec = self.format_parser.get_default_format()
     
     def apply_format_spec(self, format_spec: DocumentFormat):
         """

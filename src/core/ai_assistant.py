@@ -3,21 +3,28 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import json
 from typing import Optional, Dict, Any
+from config.config_manager import ConfigManager
 
 class DocumentAI:
-    def __init__(self, model: str = "gpt-3.5-turbo"):
+    def __init__(self, config_manager: ConfigManager):
         """
         初始化DocumentAI
         Args:
-            model: 使用的OpenAI模型名称
+            config_manager: 配置管理器实例
         """
-        load_dotenv()
-        self.api_key = os.getenv('OPENAI_API_KEY')
-        if not self.api_key:
-            raise ValueError("未找到OPENAI_API_KEY环境变量")
+        self.config_manager = config_manager
+        
+        if self.config_manager.is_ai_enabled():
+            load_dotenv()
+            self.api_key = os.getenv('OPENAI_API_KEY')
+            if not self.api_key:
+                raise ValueError("AI功能已启用但未找到OPENAI_API_KEY环境变量")
             
-        self.client = OpenAI(api_key=self.api_key)
-        self.model = model
+            self.client = OpenAI(api_key=self.api_key)
+            self.model = self.config_manager.get_ai_model()
+        else:
+            self.client = None
+            self.model = None
         
     def analyze_document(self, text: str) -> Optional[Dict[str, Any]]:
         """

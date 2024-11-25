@@ -29,37 +29,48 @@ class DocumentFormat:
     
 class FormatSpecParser:
     def __init__(self):
-        self.preset_formats = self._load_preset_formats()
+        self.preset_formats = {}
+        self._load_preset_formats()
     
-    def _load_preset_formats(self) -> Dict[str, DocumentFormat]:
+    def parse_format_file(self, file_path: str) -> Optional[DocumentFormat]:
         """
-        加载预设的格式模板
+        解析格式文件（支持YAML和JSON）
         """
-        preset_path = Path(__file__).parent / "presets"
-        formats = {}
-        
-        if preset_path.exists():
-            for format_file in preset_path.glob("*.yaml"):
-                with open(format_file, 'r', encoding='utf-8') as f:
+        try:
+            path = Path(file_path)
+            with open(path, 'r', encoding='utf-8') as f:
+                if path.suffix.lower() == '.yaml':
                     format_data = yaml.safe_load(f)
-                    formats[format_file.stem] = self._parse_format_data(format_data)
-        
-        return formats
+                else:
+                    format_data = json.load(f)
+                return self._parse_format_data(format_data)
+        except Exception as e:
+            print(f"解析格式文件失败: {str(e)}")
+            return None
     
     def _parse_format_data(self, data: dict) -> DocumentFormat:
         """
         解析格式数据为DocumentFormat对象
         """
-        return DocumentFormat(
-            title=SectionFormat(**data['title']),
-            abstract=SectionFormat(**data['abstract']),
-            keywords=SectionFormat(**data['keywords']),
-            heading1=SectionFormat(**data['heading1']),
-            heading2=SectionFormat(**data['heading2']),
-            body=SectionFormat(**data['body']),
-            references=SectionFormat(**data['references']),
-            page_margin=data['page_margin']
-        )
+        try:
+            return DocumentFormat(
+                title=SectionFormat(**data.get('title', {})),
+                abstract=SectionFormat(**data.get('abstract', {})),
+                keywords=SectionFormat(**data.get('keywords', {})),
+                heading1=SectionFormat(**data.get('heading1', {})),
+                heading2=SectionFormat(**data.get('heading2', {})),
+                body=SectionFormat(**data.get('body', {})),
+                references=SectionFormat(**data.get('references', {})),
+                page_margin=data.get('page_margin', {
+                    "top": 1.0,
+                    "bottom": 1.0,
+                    "left": 1.25,
+                    "right": 1.25
+                })
+            )
+        except Exception as e:
+            print(f"解析格式数据失败: {str(e)}")
+            return self.get_default_format()
     
     def parse_user_requirements(self, requirements: str) -> DocumentFormat:
         """

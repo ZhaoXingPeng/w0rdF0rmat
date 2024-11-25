@@ -20,4 +20,65 @@ abstract:
   space_before: 12
   space_after: 12
 
+keywords:
+  font_size: 12
+  font_name: "Times New Roman"
+  bold: false
+  italic: false
+  alignment: "LEFT"
+  first_line_indent: 0
+  line_spacing: 1.0
+  space_before: 6
+  space_after: 6
+
+heading1:
+  font_size: 14
+  font_name: "Times New Roman"
+  bold: true
+  italic: false
+  alignment: "LEFT"
+  first_line_indent: 0
+  line_spacing: 1.0
+  space_before: 12
+  space_after: 12
+
+heading2:
+  font_size: 13
+  font_name: "Times New Roman"
+  bold: true
+  italic: false
+  alignment: "LEFT"
+  first_line_indent: 0
+  line_spacing: 1.0
+  space_before: 12
+  space_after: 12
+
+body:
+  font_size: 12
+  font_name: "Times New Roman"
+  bold: false
+  italic: false
+  alignment: "JUSTIFY"
+  first_line_indent: 24
+  line_spacing: 1.5
+  space_before: 0
+  space_after: 0
+
+references:
+  font_size: 12
+  font_name: "Times New Roman"
+  bold: false
+  italic: false
+  alignment: "LEFT"
+  first_line_indent: -24
+  line_spacing: 1.0
+  space_before: 0
+  space_after: 6
+
+page_margin:
+  top: 1.0
+  bottom: 1.0
+  left: 1.25
+  right: 1.25
+
 # ... 其他部分的格式定义 ... 
