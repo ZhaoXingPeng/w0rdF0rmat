@@ -29,7 +29,10 @@ class WordFormatter:
         如果没有提供要求，则使用本地样式进行格式化
         """
         if requirements.strip():
-            format_spec = self.format_parser.parse_user_requirements(requirements)
+            format_spec = self.format_parser.parse_user_requirements(
+                requirements, 
+                self.config_manager
+            )
             self.apply_format_spec(format_spec)
         else:
             # 如果没有用户要求，直接使用本地样式

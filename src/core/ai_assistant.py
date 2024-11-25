@@ -13,18 +13,35 @@ class DocumentAI:
             config_manager: 配置管理器实例
         """
         self.config_manager = config_manager
+        self.client = None
+        self.model = None
         
         if self.config_manager.is_ai_enabled():
+            self._initialize_ai()
+    
+    def _initialize_ai(self):
+        """初始化AI相关配置"""
+        try:
             load_dotenv()
             self.api_key = os.getenv('OPENAI_API_KEY')
             if not self.api_key:
-                raise ValueError("AI功能已启用但未找到OPENAI_API_KEY环境变量")
+                print("警告：AI功能已启用但未找到OPENAI_API_KEY环境变量")
+                return
             
             self.client = OpenAI(api_key=self.api_key)
             self.model = self.config_manager.get_ai_model()
-        else:
-            self.client = None
-            self.model = None
+        except Exception as e:
+            print(f"AI初始化失败: {str(e)}")
+    
+    def _check_ai_available(self) -> bool:
+        """检查AI功能是否可用"""
+        if not self.config_manager.is_ai_enabled():
+            print("AI功能未启用")
+            return False
+        if not self.client:
+            print("AI客户端未初始化")
+            return False
+        return True
         
     def analyze_document(self, text: str) -> Optional[Dict[str, Any]]:
         """
@@ -32,8 +49,11 @@ class DocumentAI:
         Args:
             text: 文档内容
         Returns:
-            解析后的文档结构，如果解析失败返回None
+            解析后的文档结构，如果解析失败或AI未启用返回None
         """
+        if not self._check_ai_available():
+            return None
+            
         prompt = """
         请分析以下学术论文内容，识别并返回以下部分：
         1. 标题 (title)
@@ -88,8 +108,11 @@ class DocumentAI:
             section_type: 部分类型（如title, abstract等）
             content: 需要格式化的内容
         Returns:
-            格式建议，如果分析失败返回None
+            格式建议，如果分析失败或AI未启用返回None
         """
+        if not self._check_ai_available():
+            return None
+            
         format_requirements = {
             "title": "标题格式要求：字体、大小、对齐方式等",
             "abstract": "摘要格式要求：段落缩进、行距等",
@@ -152,6 +175,9 @@ class DocumentAI:
         Returns:
             是否符合格式要求
         """
+        if not self._check_ai_available():
+            return False
+            
         prompt = f"""
         请验证以下内容是否符合格式要求。
 

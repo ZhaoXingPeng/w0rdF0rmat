@@ -4,6 +4,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.enum.style import WD_STYLE_TYPE
 from .ai_assistant import DocumentAI
 import json
+from typing import Dict, Any
 
 class Document:
     def __init__(self, path, config_manager=None):
@@ -110,11 +111,51 @@ class Document:
         """
         使用AI辅助解析文档结构
         """
+        if not self.ai_assistant:
+            return False
+        
         full_text = "\n".join([para.text for para in self.doc.paragraphs])
         ai_analysis = self.ai_assistant.analyze_document(full_text)
         
         if ai_analysis:
-            self._update_structure_from_ai(ai_analysis)
+            return self._update_structure_from_ai(ai_analysis)
+        return False
+
+    def _update_structure_from_ai(self, ai_analysis: Dict[str, Any]) -> bool:
+        """
+        根据AI分析结果更新文档结构
+        Args:
+            ai_analysis: AI分析的结果
+        Returns:
+            是否成功更新结构
+        """
+        try:
+            # 更新文档各部分
+            for para in self.doc.paragraphs:
+                text = para.text.strip()
+                if not text:
+                    continue
+                
+                # 根据AI识别结果匹配段落
+                if text == ai_analysis.get('title'):
+                    self.title = para
+                elif text == ai_analysis.get('abstract'):
+                    self.abstract = para
+                elif text == ai_analysis.get('keywords'):
+                    self.keywords = para
+                
+                # 处理章节
+                for section in ai_analysis.get('sections', []):
+                    if text == section['title']:
+                        current_section = text
+                        self.sections[current_section] = []
+                    elif current_section:
+                        self.sections[current_section].append(para)
+            
+            return bool(self.title or self.abstract or self.sections)
+        except Exception as e:
+            print(f"更新文档结构失败: {str(e)}")
+            return False
 
     def _is_section_heading(self, text: str) -> bool:
         """
@@ -132,37 +173,6 @@ class Document:
         # 检查特定的标题关键词
         heading_keywords = ['引言', '介绍', '研究方法', '实验', '结果', '讨论', '结论', '参考文献']
         return any(keyword in text for keyword in heading_keywords)
-
-    def _update_structure_from_ai(self, ai_analysis):
-        """
-        根据AI分析结果更新文档结构
-        """
-        try:
-            structure = json.loads(ai_analysis)
-            
-            # 更新文档各部分
-            for para in self.doc.paragraphs:
-                text = para.text.strip()
-                
-                # 根据AI识别结果匹配段落
-                if text == structure.get('title'):
-                    self.title = para
-                elif text == structure.get('abstract'):
-                    self.abstract = para
-                elif text == structure.get('keywords'):
-                    self.keywords = para
-                
-                # 处理章节
-                for section in structure.get('sections', []):
-                    if text == section['title']:
-                        self.sections[text] = []
-                        current_section = text
-                    elif current_section:
-                        self.sections[current_section].append(para)
-        except Exception as e:
-            print(f"解析AI结果时出错: {str(e)}")
-            # 失败时使用传统方法解析
-            self._parse_document_traditional()
 
     def get_title(self):
         """获取论文标题"""

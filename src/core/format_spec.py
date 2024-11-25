@@ -92,55 +92,59 @@ class FormatSpecParser:
             print(f"解析格式数据失败: {str(e)}")
             return self._get_fallback_format()
     
-    def parse_user_requirements(self, requirements: str) -> DocumentFormat:
+    def parse_user_requirements(self, requirements: str, config_manager=None) -> DocumentFormat:
         """
         解析用户提供的格式要求
-        使用AI助手理解并标准化用户的格式要求
+        Args:
+            requirements: 用户提供的格式要求文本
+            config_manager: 配置管理器实例
+        Returns:
+            解析后的DocumentFormat对象
         """
-        from .ai_assistant import DocumentAI
-        ai = DocumentAI()
-        
-        prompt = f"""
-        请将以下论文格式要求转换为标准的JSON格式，包含以下字段：
-        - title: 标题格式
-        - abstract: 摘要格式
-        - keywords: 关键词格式
-        - heading1: 一级标题格式
-        - heading2: 二级标题格式
-        - body: 正文格式
-        - references: 参考文献格式
-        - page_margin: 页边距设置
-
-        每个部分都应包含以下属性：
-        - font_size: 字号（磅）
-        - font_name: 字体名称
-        - bold: 是否加粗（true/false）
-        - italic: 是否斜体（true/false）
-        - alignment: 对齐方式（LEFT/CENTER/RIGHT/JUSTIFY）
-        - first_line_indent: 首行缩进（磅）
-        - line_spacing: 行距
-        - space_before: 段前距（磅）
-        - space_after: 段后距（磅）
-
-        格式要求：
-        {requirements}
-        """
-        
-        try:
-            response = ai.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "你是一个专业的论文格式规范分析专家。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3
-            )
+        if config_manager and config_manager.is_ai_enabled():
+            from .ai_assistant import DocumentAI
+            ai = DocumentAI(config_manager)
             
-            format_data = json.loads(response.choices[0].message.content)
-            return self._parse_format_data(format_data)
+            prompt = f"""
+            请将以下论文格式要求转换为标准的JSON格式，包含以下字段：
+            - title: 标题格式
+            - abstract: 摘要格式
+            - keywords: 关键词格式
+            - heading1: 一级标题格式
+            - heading2: 二级标题格式
+            - body: 正文格式
+            - references: 参考文献格式
+            - page_margin: 页边距设置
+
+            每个部分都应包含以下属性：
+            - font_size: 字号（磅）
+            - font_name: 字体名称
+            - bold: 是否加粗（true/false）
+            - italic: 是否斜体（true/false）
+            - alignment: 对齐方式（LEFT/CENTER/RIGHT/JUSTIFY）
+            - first_line_indent: 首行缩进（磅）
+            - line_spacing: 行距
+            - space_before: 段前距（磅）
+            - space_after: 段后距（磅）
+
+            格式要求：
+            {requirements}
+            """
+            
+            try:
+                result = ai.suggest_formatting("document", requirements)
+                if result:
+                    return self._parse_format_data(result)
+            except Exception as e:
+                print(f"AI解析格式要求失败: {str(e)}")
+        
+        # 如果AI解析失败或未启用，尝试使用简单的规则解析
+        try:
+            # 这里可以添加简单的规则解析逻辑
+            # 暂时返回默认格式
+            return self.get_default_format()
         except Exception as e:
-            print(f"解析格式要求时出错: {str(e)}")
-            # 返回默认格式
+            print(f"解析格式要求失败: {str(e)}")
             return self.get_default_format()
     
     def get_default_format(self) -> DocumentFormat:
