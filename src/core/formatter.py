@@ -3,6 +3,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.table import _Cell, _Row, _Column
 from docx.shared import RGBColor
+from docx.oxml import parse_xml
 from .format_spec import FormatSpecParser, DocumentFormat
 
 class WordFormatter:
@@ -175,52 +176,50 @@ class WordFormatter:
             table.style = 'Table Grid'
             table.autofit = True
             
-            # 先清除所有边框
+            # 清除所有边框
             for row in table.rows:
                 for cell in row.cells:
-                    for side in ['top', 'left', 'bottom', 'right']:
-                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_top()
-                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_left()
-                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
-                        cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_right()
+                    # 使用python-docx提供的方法设置边框
+                    cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/></w:tcBorders>'))
             
             # 添加三条主要横线
             # 顶线
             for cell in table.rows[0].cells:
-                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_top()
-                border.set('val', 'single')
-                border.set('sz', '12')
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:top w:val="single" w:sz="12"/></w:tcBorders>'))
             
             # 表头下横线
             for cell in table.rows[0].cells:
-                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
-                border.set('val', 'single')
-                border.set('sz', '12')
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bottom w:val="single" w:sz="12"/></w:tcBorders>'))
             
             # 底线
             for cell in table.rows[-1].cells:
-                border = cell._tc.get_or_add_tcPr().get_or_add_tcBorders().get_or_add_bottom()
-                border.set('val', 'single')
-                border.set('sz', '12')
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bottom w:val="single" w:sz="12"/></w:tcBorders>'))
             
             # 设置单元格格式
             for i, row in enumerate(table.rows):
                 for cell in row.cells:
-                    # 创建新的段落运行
+                    # 保存原始文本
+                    text = cell.text.strip()
+                    
+                    # ���除现有内容
+                    for paragraph in cell.paragraphs:
+                        paragraph.clear()
+                    
+                    # 创建新的段落和运行
                     paragraph = cell.paragraphs[0]
-                    paragraph.clear()  # 清除现有内容
-                    run = paragraph.add_run(cell.text.strip())
+                    run = paragraph.add_run(text)
                     
                     # 设置字体格式
-                    run.font.size = Pt(self.format_spec.tables.font_size)
-                    run.font.name = self.format_spec.tables.font_name
+                    font = run.font
+                    font.size = Pt(self.format_spec.tables.font_size)
+                    font.name = self.format_spec.tables.font_name
                     
                     # 表头加粗
                     if i == 0:
-                        run.font.bold = True
+                        font.bold = True
                         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                     else:
-                        run.font.bold = False
+                        font.bold = False
                         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
                     
         except Exception as e:
