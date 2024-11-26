@@ -1,17 +1,19 @@
-from docx.shared import Pt, Inches, Cm
+from docx.shared import Pt, Inches, Cm, Mm
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.table import _Cell, _Row, _Column
 from docx.shared import RGBColor
 from docx.oxml import parse_xml
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.section import WD_SECTION, WD_ORIENT
 from .format_spec import (
     FormatSpecParser, 
     DocumentFormat, 
     TableCellFormat, 
     TableFormat,
     CaptionFormat,
-    ImageFormat
+    ImageFormat,
+    PageSetupFormat
 )
 
 class WordFormatter:
@@ -89,6 +91,10 @@ class WordFormatter:
         实现文档格式化的主要逻辑
         """
         try:
+            # 首先设置页面格式
+            self.format_page_setup()
+            
+            # 其他格式化操作
             self.format_title()
             self.format_abstract()
             self.format_keywords()
@@ -97,8 +103,111 @@ class WordFormatter:
             self.format_tables()
             self.format_images()
             self.format_captions()
+            self.format_toc()
         except Exception as e:
             print(f"格式化过程中出错: {str(e)}")
+    
+    def format_page_setup(self):
+        """设置页面格式"""
+        try:
+            # 获取文档的节
+            section = self.document.doc.sections[0]
+            
+            # 设置页面大小
+            section.page_width = Pt(self.format_spec.page_setup.page_width)
+            section.page_height = Pt(self.format_spec.page_setup.page_height)
+            
+            # 设置页边距
+            section.top_margin = Pt(self.format_spec.page_setup.margin_top)
+            section.bottom_margin = Pt(self.format_spec.page_setup.margin_bottom)
+            section.left_margin = Pt(self.format_spec.page_setup.margin_left)
+            section.right_margin = Pt(self.format_spec.page_setup.margin_right)
+            
+            # 设置页眉页脚距离
+            section.header_distance = Pt(self.format_spec.page_setup.header_distance)
+            section.footer_distance = Pt(self.format_spec.page_setup.footer_distance)
+            
+            # 设置首页不同
+            section.different_first_page_header_footer = self.format_spec.page_setup.different_first_page
+            
+            # 设置页码
+            self._setup_page_numbers(section)
+            
+            # 设置分栏
+            if self.format_spec.page_setup.columns > 1:
+                self._setup_columns(section)
+            
+            # 设置纸张方向
+            if self.format_spec.page_setup.orientation == "LANDSCAPE":
+                section.orientation = WD_ORIENT.LANDSCAPE
+            else:
+                section.orientation = WD_ORIENT.PORTRAIT
+                
+        except Exception as e:
+            print(f"设置页面格式时出错: {str(e)}")
+    
+    def _setup_page_numbers(self, section):
+        """设置页码"""
+        # 获取页脚段落
+        footer = section.footer
+        paragraph = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        
+        # 清除现有内容
+        paragraph.clear()
+        
+        # 如果不需要在首页显示页码且是首页不同
+        if not self.format_spec.page_setup.page_number_show_first and \
+           self.format_spec.page_setup.different_first_page:
+            return
+        
+        # 设置页码格式
+        page_number_format = {
+            "ARABIC": "decimal",
+            "ROMAN": "upperRoman",
+            "LETTER": "upperLetter"
+        }.get(self.format_spec.page_setup.page_number_format, "decimal")
+        
+        # 添加页码字段
+        run = paragraph.add_run()
+        fldChar = parse_xml(r'<w:fldChar w:fldCharType="begin"/>')
+        run._r.append(fldChar)
+        
+        instr = parse_xml(f'<w:instrText>PAGE \* {page_number_format}</w:instrText>')
+        run._r.append(instr)
+        
+        fldChar = parse_xml(r'<w:fldChar w:fldCharType="end"/>')
+        run._r.append(fldChar)
+        
+        # 设置页码位置
+        position_map = {
+            "TOP_LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "TOP_CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "TOP_RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT,
+            "BOTTOM_LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "BOTTOM_CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "BOTTOM_RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        paragraph.alignment = position_map.get(
+            self.format_spec.page_setup.page_number_position,
+            WD_PARAGRAPH_ALIGNMENT.CENTER
+        )
+    
+    def _setup_columns(self, section):
+        """设置分栏"""
+        # 获取节属性
+        sectPr = section._sectPr
+        
+        # 清除现有的分栏设置
+        for cols in sectPr.xpath('./w:cols'):
+            cols.getparent().remove(cols)
+        
+        # 添加新的分栏设置
+        cols = parse_xml(f'''
+            <w:cols xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+                   w:num="{self.format_spec.page_setup.columns}"
+                   w:space="{int(self.format_spec.page_setup.column_spacing * 20)}"/>
+        ''')
+        sectPr.append(cols)
     
     def format_title(self):
         """
@@ -624,4 +733,111 @@ class WordFormatter:
             
         except Exception as e:
             print(f"格式化表格标题时出错: {str(e)}")
+    
+    def format_toc(self):
+        """生成并格式化目录"""
+        try:
+            if self.format_spec.toc.start_on_new_page:
+                self.document.doc.add_page_break()
+            
+            # 添加目录标题
+            title_paragraph = self.document.doc.add_paragraph(self.format_spec.toc.title)
+            self._format_toc_title(title_paragraph)
+            
+            # 收集标题信息
+            headings = self._collect_headings()
+            
+            # 生成目录项
+            for level, text, page_number in headings:
+                if level <= self.format_spec.toc.include_heading_levels:
+                    self._add_toc_entry(level, text, page_number)
+        
+        except Exception as e:
+            print(f"生成目录时出错: {str(e)}")
+
+    def _format_toc_title(self, paragraph):
+        """格式化目录标题"""
+        # 清除现有格式
+        paragraph.clear()
+        
+        # 添加标题文本
+        run = paragraph.add_run(self.format_spec.toc.title)
+        font = run.font
+        font.size = Pt(self.format_spec.toc.title_font_size)
+        font.name = self.format_spec.toc.title_font_name
+        font.bold = self.format_spec.toc.title_bold
+        
+        # 设置对齐方式
+        alignment_map = {
+            "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        paragraph.alignment = alignment_map.get(
+            self.format_spec.toc.title_alignment,
+            WD_PARAGRAPH_ALIGNMENT.CENTER
+        )
+
+    def _collect_headings(self):
+        """收集文档中的标题信息"""
+        headings = []
+        current_page = 1
+        
+        for paragraph in self.document.doc.paragraphs:
+            # 检查是否遇到分页符
+            if paragraph._p.xpath('.//w:br[@w:type="page"]'):
+                current_page += 1
+            
+            # 检查段落是否为标题
+            if paragraph.style.name.startswith('Heading'):
+                level = int(paragraph.style.name[-1])
+                headings.append((level, paragraph.text, current_page))
+        
+        return headings
+
+    def _add_toc_entry(self, level, text, page_number):
+        """添加目录项"""
+        paragraph = self.document.doc.add_paragraph()
+        
+        # 设置缩进
+        indent = self.format_spec.toc.level1_indent if level == 1 else self.format_spec.toc.level2_indent
+        paragraph.paragraph_format.left_indent = Pt(indent)
+        
+        # 添加标题文本
+        run = paragraph.add_run(text)
+        
+        # 设置格式
+        if level == 1:
+            font_size = self.format_spec.toc.level1_font_size
+            font_name = self.format_spec.toc.level1_font_name
+            bold = self.format_spec.toc.level1_bold
+            tab_space = self.format_spec.toc.level1_tab_space
+        else:
+            font_size = self.format_spec.toc.level2_font_size
+            font_name = self.format_spec.toc.level2_font_name
+            bold = self.format_spec.toc.level2_bold
+            tab_space = self.format_spec.toc.level2_tab_space
+        
+        run.font.size = Pt(font_size)
+        run.font.name = font_name
+        run.font.bold = bold
+        
+        # 添加制表符和页码
+        if self.format_spec.toc.show_page_numbers:
+            paragraph.add_run('\t')
+            page_number_run = paragraph.add_run(str(page_number))
+            page_number_run.font.size = Pt(font_size)
+            page_number_run.font.name = font_name
+            
+            # 设置制表符
+            paragraph.paragraph_format.tab_stops.add_tab_stop(
+                Pt(tab_space),
+                WD_TAB_ALIGNMENT.RIGHT,
+                WD_TAB_LEADER.DOTS
+            )
+        
+        # 设置行距
+        paragraph.paragraph_format.line_spacing = self.format_spec.toc.line_spacing
+        paragraph.paragraph_format.space_before = Pt(self.format_spec.toc.space_before)
+        paragraph.paragraph_format.space_after = Pt(self.format_spec.toc.space_after)
     

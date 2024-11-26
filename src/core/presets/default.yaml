@@ -134,4 +134,60 @@ images:
   space_before: 12
   space_after: 12
 
+page_setup:
+  # 页面大小（A4纸）
+  page_width: 595.0
+  page_height: 842.0
+  
+  # 页边距
+  margin_top: 72.0
+  margin_bottom: 72.0
+  margin_left: 90.0
+  margin_right: 90.0
+  
+  # 页眉页脚
+  header_distance: 36.0
+  footer_distance: 36.0
+  different_first_page: true
+  
+  # 页码设置
+  page_number_format: "ARABIC"
+  page_number_start: 1
+  page_number_position: "BOTTOM_CENTER"
+  page_number_show_first: false
+  
+  # 分栏设置
+  columns: 1
+  column_spacing: 36.0
+  
+  # 纸张方向
+  orientation: "PORTRAIT"
+
+toc:
+  title: "目录"
+  title_font_size: 14
+  title_font_name: "Times New Roman"
+  title_bold: true
+  title_alignment: "CENTER"
+  
+  level1_font_size: 12
+  level1_font_name: "Times New Roman"
+  level1_bold: false
+  level1_indent: 0
+  level1_tab_space: 24
+  
+  level2_font_size: 12
+  level2_font_name: "Times New Roman"
+  level2_bold: false
+  level2_indent: 24
+  level2_tab_space: 24
+  
+  line_spacing: 1.5
+  space_before: 0
+  space_after: 12
+  show_page_numbers: true
+  right_align_page_numbers: true
+  include_heading_levels: 2
+  start_on_new_page: true
+
 # ... 其他部分的格式定义 ... 

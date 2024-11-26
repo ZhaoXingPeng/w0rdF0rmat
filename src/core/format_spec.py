@@ -105,6 +105,69 @@ class CaptionFormat:
     end_mark: str = ""  # 标题末尾的标记（如句号）
 
 @dataclass
+class PageSetupFormat:
+    """页面设置格式定义"""
+    # 页面大小
+    page_width: float = 595.0  # A4纸宽度（磅值）
+    page_height: float = 842.0  # A4纸高度（磅值）
+    
+    # 页边距（磅值）
+    margin_top: float = 72.0    # 1英寸 = 72磅
+    margin_bottom: float = 72.0
+    margin_left: float = 90.0   # 约1.25英寸
+    margin_right: float = 90.0
+    
+    # 页眉页脚
+    header_distance: float = 36.0  # 页眉距离页面顶部的距离
+    footer_distance: float = 36.0  # 页脚距离页面底部的距离
+    different_first_page: bool = True  # 首页是否不同
+    
+    # 页码设置
+    page_number_format: str = "ARABIC"  # ARABIC (1,2,3), ROMAN (I,II,III), LETTER (A,B,C)
+    page_number_start: int = 1
+    page_number_position: str = "BOTTOM_CENTER"  # TOP_CENTER, BOTTOM_RIGHT 等
+    page_number_show_first: bool = False  # 首页是否显示页码
+    
+    # 分栏设置
+    columns: int = 1
+    column_spacing: float = 36.0  # 栏间距（磅值）
+    
+    # 纸张方向
+    orientation: str = "PORTRAIT"  # PORTRAIT 或 LANDSCAPE
+
+@dataclass
+class TOCFormat:
+    """目录格式定义"""
+    title: str = "目录"  # 目录标题
+    title_font_size: float = 14
+    title_font_name: str = "Times New Roman"
+    title_bold: bool = True
+    title_alignment: str = "CENTER"
+    
+    # 一级目录项格式
+    level1_font_size: float = 12
+    level1_font_name: str = "Times New Roman"
+    level1_bold: bool = False
+    level1_indent: float = 0
+    level1_tab_space: float = 24  # 标题与页码之间的间距
+    
+    # 二级目录项格式
+    level2_font_size: float = 12
+    level2_font_name: str = "Times New Roman"
+    level2_bold: bool = False
+    level2_indent: float = 24
+    level2_tab_space: float = 24
+    
+    # 目录整体格式
+    line_spacing: float = 1.5
+    space_before: float = 0
+    space_after: float = 12
+    show_page_numbers: bool = True
+    right_align_page_numbers: bool = True
+    include_heading_levels: int = 2  # 包含的标题级别数
+    start_on_new_page: bool = True
+
+@dataclass
 class DocumentFormat:
     title: SectionFormat
     abstract: SectionFormat
@@ -118,6 +181,8 @@ class DocumentFormat:
     images: ImageFormat = None
     figure_caption: CaptionFormat = None
     table_caption: CaptionFormat = None
+    page_setup: PageSetupFormat = None
+    toc: TOCFormat = None
 
     def __post_init__(self):
         if self.tables is None:
@@ -128,6 +193,10 @@ class DocumentFormat:
             self.figure_caption = CaptionFormat(prefix="图")
         if self.table_caption is None:
             self.table_caption = CaptionFormat(prefix="表")
+        if self.page_setup is None:
+            self.page_setup = PageSetupFormat()
+        if self.toc is None:
+            self.toc = TOCFormat()
 
 class FormatSpecParser:
     def __init__(self):
@@ -192,7 +261,9 @@ class FormatSpecParser:
                 tables=TableFormat(**data.get('tables', {})),
                 images=ImageFormat(**data.get('images', {})),
                 figure_caption=CaptionFormat(**data.get('figure_caption', {})),
-                table_caption=CaptionFormat(**data.get('table_caption', {}))
+                table_caption=CaptionFormat(**data.get('table_caption', {})),
+                page_setup=PageSetupFormat(**data.get('page_setup', {})),
+                toc=TOCFormat(**data.get('toc', {}))
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")
@@ -275,7 +346,9 @@ class FormatSpecParser:
             tables=TableFormat(),
             images=ImageFormat(),
             figure_caption=CaptionFormat(prefix="图"),
-            table_caption=CaptionFormat(prefix="表")
+            table_caption=CaptionFormat(prefix="表"),
+            page_setup=PageSetupFormat(),
+            toc=TOCFormat()
         ) 
     
     def parse_document_styles(self, document) -> Optional[DocumentFormat]:
