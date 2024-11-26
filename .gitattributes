@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+*.py text eol=lf encoding=utf-8
+*.yaml text eol=lf encoding=utf-8
+*.md text eol=lf encoding=utf-8
