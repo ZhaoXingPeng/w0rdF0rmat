@@ -172,77 +172,130 @@ class WordFormatter:
     def _apply_three_line_style(self, table):
         """应用三线表样式"""
         try:
-            # 设置表格整体格式
-            table.style = 'Table Grid'
-            table.autofit = True
+            # 首先清除表格的所有样式
+            table.style = None
             
-            # 清除所有边框
+            # 清除所有单元格的格式和边框
             for row in table.rows:
                 for cell in row.cells:
-                    # 使用python-docx提供的方法设置边框
-                    cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/></w:tcBorders>'))
-            
-            # 添加三条主要横线
-            # 顶线
-            for cell in table.rows[0].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:top w:val="single" w:sz="12"/></w:tcBorders>'))
-            
-            # 表头下横线
-            for cell in table.rows[0].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bottom w:val="single" w:sz="12"/></w:tcBorders>'))
-            
-            # 底线
-            for cell in table.rows[-1].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bottom w:val="single" w:sz="12"/></w:tcBorders>'))
-            
-            # 设置单元格格式
-            for i, row in enumerate(table.rows):
-                for cell in row.cells:
-                    # 保存原始文本
+                    # 清除单元格边框
+                    cell._tc.get_or_add_tcPr().append(parse_xml(r'''
+                        <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                            <w:top w:val="none"/>
+                            <w:left w:val="none"/>
+                            <w:bottom w:val="none"/>
+                            <w:right w:val="none"/>
+                            <w:insideH w:val="none"/>
+                            <w:insideV w:val="none"/>
+                        </w:tcBorders>
+                    '''))
+                    
+                    # 清除并重新设置单元格内容格式
                     text = cell.text.strip()
-                    
-                    # ���除现有内容
-                    for paragraph in cell.paragraphs:
-                        paragraph.clear()
-                    
-                    # 创建新的段落和运行
+                    cell._tc.clear_content()
                     paragraph = cell.paragraphs[0]
-                    run = paragraph.add_run(text)
+                    
+            # 设置表格整体属性
+            table.autofit = True
+            table.allow_autofit = True
+            
+            # 重新添加内容并设置格式
+            for i, row in enumerate(table.rows):
+                for j, cell in enumerate(row.cells):
+                    # 获取原始文本
+                    original_text = table.cell(i, j).text.strip()
+                    
+                    # 清除现有内容
+                    cell._tc.clear_content()
+                    paragraph = cell.paragraphs[0]
+                    
+                    # 添加新的文本
+                    run = paragraph.add_run(original_text)
                     
                     # 设置字体格式
                     font = run.font
                     font.size = Pt(self.format_spec.tables.font_size)
                     font.name = self.format_spec.tables.font_name
                     
-                    # 表头加粗
+                    # 表头加粗并居中
                     if i == 0:
                         font.bold = True
                         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                     else:
                         font.bold = False
                         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-                    
+            
+            # 添加三线表的边框
+            # 顶线
+            for cell in table.rows[0].cells:
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
+                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                        <w:top w:val="single" w:sz="12" w:space="0"/>
+                    </w:tcBorders>
+                '''))
+            
+            # 表头下横线
+            for cell in table.rows[0].cells:
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
+                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                        <w:bottom w:val="single" w:sz="12" w:space="0"/>
+                    </w:tcBorders>
+                '''))
+            
+            # 底线
+            for cell in table.rows[-1].cells:
+                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
+                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                        <w:bottom w:val="single" w:sz="12" w:space="0"/>
+                    </w:tcBorders>
+                '''))
+                
         except Exception as e:
             print(f"应用三线表样式时出错: {str(e)}")
 
     def _apply_grid_style(self, table):
         """应用网格表样式"""
-        # 设置表格整体格式
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.allow_autofit = True
-        
-        # 设置所有边框
-        self._set_all_borders(table)
-        
-        # 设置单元格格式
-        for i, row in enumerate(table.rows):
-            for cell in row.cells:
-                self._format_table_cell(cell,
-                    bold=(i == 0),  # 表头加粗
-                    font_size=self.format_spec.tables.font_size,
-                    font_name=self.format_spec.tables.font_name,
-                    alignment="CENTER"
-                )
+        try:
+            # 首先清除表格的所有样式
+            table.style = None
+            
+            # 清除并重新设置所有单元格的格式
+            for i, row in enumerate(table.rows):
+                for j, cell in enumerate(row.cells):
+                    # 获取原始文本
+                    original_text = table.cell(i, j).text.strip()
+                    
+                    # 清除现有内容
+                    cell._tc.clear_content()
+                    paragraph = cell.paragraphs[0]
+                    
+                    # 添加新的文本
+                    run = paragraph.add_run(original_text)
+                    
+                    # 设置字体格式
+                    font = run.font
+                    font.size = Pt(self.format_spec.tables.font_size)
+                    font.name = self.format_spec.tables.font_name
+                    
+                    # 表头加粗并居中
+                    if i == 0:
+                        font.bold = True
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    else:
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    
+                    # 设置网格边框
+                    cell._tc.get_or_add_tcPr().append(parse_xml(r'''
+                        <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                            <w:top w:val="single" w:sz="4" w:space="0"/>
+                            <w:left w:val="single" w:sz="4" w:space="0"/>
+                            <w:bottom w:val="single" w:sz="4" w:space="0"/>
+                            <w:right w:val="single" w:sz="4" w:space="0"/>
+                        </w:tcBorders>
+                    '''))
+                    
+        except Exception as e:
+            print(f"应用网格表样式时出错: {str(e)}")
 
     def _apply_default_table_style(self, table):
         """应用默认表格样式"""
