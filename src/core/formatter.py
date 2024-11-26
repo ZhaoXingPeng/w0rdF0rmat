@@ -4,7 +4,15 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.table import _Cell, _Row, _Column
 from docx.shared import RGBColor
 from docx.oxml import parse_xml
-from .format_spec import FormatSpecParser, DocumentFormat, TableCellFormat, TableFormat
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from .format_spec import (
+    FormatSpecParser, 
+    DocumentFormat, 
+    TableCellFormat, 
+    TableFormat,
+    CaptionFormat,
+    ImageFormat
+)
 
 class WordFormatter:
     def __init__(self, document, config_manager):
