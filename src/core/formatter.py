@@ -175,6 +175,14 @@ class WordFormatter:
             # 首先清除表格的所有样式
             table.style = None
             
+            # 保存原始数据
+            original_data = []
+            for row in table.rows:
+                row_data = []
+                for cell in row.cells:
+                    row_data.append(cell.text.strip())
+                original_data.append(row_data)
+            
             # 清除所有单元格的格式和边框
             for row in table.rows:
                 for cell in row.cells:
@@ -189,28 +197,19 @@ class WordFormatter:
                             <w:insideV w:val="none"/>
                         </w:tcBorders>
                     '''))
-                    
-                    # 清除并重新设置单元格内容格式
-                    text = cell.text.strip()
-                    cell._tc.clear_content()
-                    paragraph = cell.paragraphs[0]
-                    
-            # 设置表格整体属性
-            table.autofit = True
-            table.allow_autofit = True
             
             # 重新添加内容并设置格式
             for i, row in enumerate(table.rows):
                 for j, cell in enumerate(row.cells):
-                    # 获取原始文本
-                    original_text = table.cell(i, j).text.strip()
+                    # 确保至少有一个段落
+                    if not cell.paragraphs:
+                        cell._tc.append(parse_xml('<w:p/>'))
                     
-                    # 清除现有内容
-                    cell._tc.clear_content()
                     paragraph = cell.paragraphs[0]
+                    paragraph.clear()  # 清除段落内容
                     
-                    # 添加新的文本
-                    run = paragraph.add_run(original_text)
+                    # 添加文本
+                    run = paragraph.add_run(original_data[i][j])
                     
                     # 设置字体格式
                     font = run.font
@@ -259,18 +258,26 @@ class WordFormatter:
             # 首先清除表格的所有样式
             table.style = None
             
+            # 保存原始数据
+            original_data = []
+            for row in table.rows:
+                row_data = []
+                for cell in row.cells:
+                    row_data.append(cell.text.strip())
+                original_data.append(row_data)
+            
             # 清除并重新设置所有单元格的格式
             for i, row in enumerate(table.rows):
                 for j, cell in enumerate(row.cells):
-                    # 获取原始文本
-                    original_text = table.cell(i, j).text.strip()
+                    # 确保至少有一个段落
+                    if not cell.paragraphs:
+                        cell._tc.append(parse_xml('<w:p/>'))
                     
-                    # 清除现有内容
-                    cell._tc.clear_content()
                     paragraph = cell.paragraphs[0]
+                    paragraph.clear()  # 清除段落内容
                     
-                    # 添加新的文本
-                    run = paragraph.add_run(original_text)
+                    # 添加文本
+                    run = paragraph.add_run(original_data[i][j])
                     
                     # 设置字体格式
                     font = run.font
