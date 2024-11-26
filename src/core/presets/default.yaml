@@ -83,14 +83,37 @@ page_margin:
 
 tables:
   style: "DEFAULT"
-  font_size: 10.5
-  font_name: "Times New Roman"
   alignment: "CENTER"
-  header_bold: true
+  width: null
+  
+  header_format:
+    font_size: 10.5
+    font_name: "Times New Roman"
+    bold: true
+    italic: false
+    alignment: "CENTER"
+    vertical_alignment: "CENTER"
+    text_color: "000000"
+    background_color: null
+    line_spacing: 1.0
+  
+  data_format:
+    font_size: 10.5
+    font_name: "Times New Roman"
+    bold: false
+    italic: false
+    alignment: "LEFT"
+    vertical_alignment: "CENTER"
+    text_color: "000000"
+    background_color: null
+    line_spacing: 1.0
+  
   row_height: 12
   col_width: 100
-  cell_padding: 2
-  line_spacing: 1.0
+  auto_fit: true
+  
+  border_size: 1.0
+  border_color: "000000"
   borders:
     top: true
     bottom: true
@@ -98,6 +121,10 @@ tables:
     right: true
     inside_h: true
     inside_v: true
+  
+  cell_padding: 2
+  spacing_before: 6
+  spacing_after: 6
 
 images:
   alignment: "CENTER"

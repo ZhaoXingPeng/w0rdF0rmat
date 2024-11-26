@@ -17,18 +17,44 @@ class SectionFormat:
     space_after: float = 0
 
 @dataclass
+class TableCellFormat:
+    """表格单元格格式定义"""
+    font_size: float = 10.5
+    font_name: str = "Times New Roman"
+    bold: bool = False
+    italic: bool = False
+    alignment: str = "CENTER"
+    vertical_alignment: str = "CENTER"  # TOP, CENTER, BOTTOM
+    text_color: str = "000000"  # RGB格式
+    background_color: str = None  # RGB格式，None表示无背景色
+    line_spacing: float = 1.0
+
+@dataclass
 class TableFormat:
     """表格格式定义"""
     style: str = "DEFAULT"  # 表格样式：DEFAULT, THREE_LINE, GRID
-    font_size: float = 10.5
-    font_name: str = "Times New Roman"
-    alignment: str = "CENTER"
-    header_bold: bool = True
-    row_height: float = 12  # 行高（磅值）
+    width: float = None  # 表格宽度（磅值），None表示自适应
+    alignment: str = "CENTER"  # 表格整体对齐方式
+    
+    # 表头格式
+    header_format: TableCellFormat = None
+    # 数据单元格格式
+    data_format: TableCellFormat = None
+    
+    # 行高和列宽
+    row_height: float = 12  # 默认行高（磅值）
     col_width: float = 100  # 默认列宽（磅值）
+    auto_fit: bool = True  # 是否自动调整大小
+    
+    # 边框设置
+    border_size: float = 1.0  # 边框粗细（磅值）
+    border_color: str = "000000"  # 边框颜色（RGB格式）
+    borders: Dict[str, bool] = None  # 边框显示设置
+    
+    # 间距设置
     cell_padding: float = 2  # 单元格内边距（磅值）
-    line_spacing: float = 1.0  # 单元格内行距
-    borders: Dict[str, bool] = None  # 边框设置
+    spacing_before: float = 6  # 表格前间距
+    spacing_after: float = 6  # 表格后间距
 
     def __post_init__(self):
         if self.borders is None:
@@ -40,6 +66,17 @@ class TableFormat:
                 "inside_h": True,
                 "inside_v": True
             }
+        if self.header_format is None:
+            self.header_format = TableCellFormat(
+                font_size=10.5,
+                bold=True,
+                alignment="CENTER"
+            )
+        if self.data_format is None:
+            self.data_format = TableCellFormat(
+                font_size=10.5,
+                alignment="LEFT"
+            )
 
 @dataclass
 class ImageFormat:
@@ -54,6 +91,20 @@ class ImageFormat:
     space_after: float = 12  # 图片后间距
 
 @dataclass
+class CaptionFormat:
+    """图表标题格式定义"""
+    prefix: str = ""  # 前缀（如"图"或"表"）
+    font_size: float = 10.5
+    font_name: str = "Times New Roman"
+    bold: bool = False
+    alignment: str = "CENTER"
+    space_before: float = 6
+    space_after: float = 6
+    numbering_style: str = "ARABIC"  # ARABIC (1,2,3) or CHINESE (一,二,三)
+    separator: str = " "  # 编号与标题文本之间的分隔符
+    end_mark: str = ""  # 标题末尾的标记（如句号）
+
+@dataclass
 class DocumentFormat:
     title: SectionFormat
     abstract: SectionFormat
@@ -65,12 +116,18 @@ class DocumentFormat:
     page_margin: Dict[str, float]
     tables: TableFormat = None
     images: ImageFormat = None
+    figure_caption: CaptionFormat = None
+    table_caption: CaptionFormat = None
 
     def __post_init__(self):
         if self.tables is None:
             self.tables = TableFormat()
         if self.images is None:
             self.images = ImageFormat()
+        if self.figure_caption is None:
+            self.figure_caption = CaptionFormat(prefix="图")
+        if self.table_caption is None:
+            self.table_caption = CaptionFormat(prefix="表")
 
 class FormatSpecParser:
     def __init__(self):
@@ -133,7 +190,9 @@ class FormatSpecParser:
                     "right": 1.25
                 }),
                 tables=TableFormat(**data.get('tables', {})),
-                images=ImageFormat(**data.get('images', {}))
+                images=ImageFormat(**data.get('images', {})),
+                figure_caption=CaptionFormat(**data.get('figure_caption', {})),
+                table_caption=CaptionFormat(**data.get('table_caption', {}))
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")
@@ -214,7 +273,9 @@ class FormatSpecParser:
             references=SectionFormat(font_size=10.5, first_line_indent=-24),
             page_margin={"top": 1.0, "bottom": 1.0, "left": 1.25, "right": 1.25},
             tables=TableFormat(),
-            images=ImageFormat()
+            images=ImageFormat(),
+            figure_caption=CaptionFormat(prefix="图"),
+            table_caption=CaptionFormat(prefix="表")
         ) 
     
     def parse_document_styles(self, document) -> Optional[DocumentFormat]:

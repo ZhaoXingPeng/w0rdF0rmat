@@ -4,7 +4,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.table import _Cell, _Row, _Column
 from docx.shared import RGBColor
 from docx.oxml import parse_xml
-from .format_spec import FormatSpecParser, DocumentFormat
+from .format_spec import FormatSpecParser, DocumentFormat, TableCellFormat, TableFormat
 
 class WordFormatter:
     def __init__(self, document, config_manager):
@@ -88,6 +88,7 @@ class WordFormatter:
             self.format_references()
             self.format_tables()
             self.format_images()
+            self.format_captions()
         except Exception as e:
             print(f"格式化过程中出错: {str(e)}")
     
@@ -321,23 +322,103 @@ class WordFormatter:
                     font_name=self.format_spec.tables.font_name
                 )
 
-    def _format_table_cell(self, cell, bold=False, font_size=10.5, 
-                          font_name="Times New Roman", alignment="LEFT"):
-        """设置单元格格式"""
-        # 清除现有内容并重新创建
+    def _format_table_cell(self, cell, format_spec: TableCellFormat):
+        """
+        设置单元格格式
+        Args:
+            cell: 要格式化的单元格
+            format_spec: 单元格格式规范
+        """
+        # 保存原始文本
+        text = cell.text.strip()
+        
+        # 清除现有内容
         paragraph = cell.paragraphs[0]
-        text = paragraph.text
         paragraph.clear()
+        
+        # 添加新的文本
         run = paragraph.add_run(text)
         
         # 设置字体格式
-        run.font.size = Pt(font_size)
-        run.font.name = font_name
-        run.font.bold = bold
+        font = run.font
+        font.size = Pt(format_spec.font_size)
+        font.name = format_spec.font_name
+        font.bold = format_spec.bold
+        font.italic = format_spec.italic
+        
+        # 设置颜色
+        if format_spec.text_color:
+            font.color.rgb = RGBColor.from_string(format_spec.text_color)
+        
+        # 设置背景色
+        if format_spec.background_color:
+            cell._tc.get_or_add_tcPr().append(parse_xml(
+                f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+                f'w:fill="{format_spec.background_color}"/>'
+            ))
         
         # 设置对齐方式
-        if alignment in WD_PARAGRAPH_ALIGNMENT.__members__:
-            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.__members__[alignment]
+        alignment_map = {
+            "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        paragraph.alignment = alignment_map.get(format_spec.alignment, WD_PARAGRAPH_ALIGNMENT.LEFT)
+        
+        # 设置垂直对齐
+        v_alignment_map = {
+            "TOP": WD_CELL_VERTICAL_ALIGNMENT.TOP,
+            "CENTER": WD_CELL_VERTICAL_ALIGNMENT.CENTER,
+            "BOTTOM": WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
+        }
+        cell.vertical_alignment = v_alignment_map.get(
+            format_spec.vertical_alignment, 
+            WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        )
+        
+        # 设置行距
+        paragraph.paragraph_format.line_spacing = format_spec.line_spacing
+
+    def _apply_table_format(self, table, format_spec: TableFormat):
+        """应用表格格式"""
+        try:
+            # 设置表格整体属性
+            table.alignment = WD_TABLE_ALIGNMENT.__members__.get(
+                format_spec.alignment, 
+                WD_TABLE_ALIGNMENT.CENTER
+            )
+            table.allow_autofit = format_spec.auto_fit
+            
+            # 设置表格宽度
+            if format_spec.width:
+                table.width = Pt(format_spec.width)
+            
+            # 设置行高和列宽
+            for row in table.rows:
+                row.height = Pt(format_spec.row_height)
+            for column in table.columns:
+                column.width = Pt(format_spec.col_width)
+            
+            # 格式化单元格
+            for i, row in enumerate(table.rows):
+                for cell in row.cells:
+                    if i == 0:  # 表头行
+                        self._format_table_cell(cell, format_spec.header_format)
+                    else:  # 数据行
+                        self._format_table_cell(cell, format_spec.data_format)
+            
+            # 设置表格间距
+            table._element.get_or_add_tblPr().append(parse_xml(
+                f'<w:tblspcBefore xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+                f'w:w="{int(format_spec.spacing_before * 20)}" w:type="dxa"/>'
+            ))
+            table._element.get_or_add_tblPr().append(parse_xml(
+                f'<w:tblspcAfter xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+                f'w:w="{int(format_spec.spacing_after * 20)}" w:type="dxa"/>'
+            ))
+            
+        except Exception as e:
+            print(f"应用表格格式时出错: {str(e)}")
 
     def _clear_table_borders(self, table):
         """清除表格所有边框"""
@@ -449,4 +530,90 @@ class WordFormatter:
         """判断段落是否为图注"""
         text = paragraph.text.strip().lower()
         return text.startswith('图') or text.startswith('fig')
+    
+    def format_captions(self):
+        """格式化图表标题"""
+        for paragraph in self.document.doc.paragraphs:
+            if self._is_figure_caption(paragraph):
+                self._format_figure_caption(paragraph)
+            elif self._is_table_caption(paragraph):
+                self._format_table_caption(paragraph)
+
+    def _is_figure_caption(self, paragraph) -> bool:
+        """判断是否为图片标题"""
+        text = paragraph.text.strip()
+        return text.startswith('图') or text.lower().startswith('fig')
+
+    def _is_table_caption(self, paragraph) -> bool:
+        """判断是否为表格标题"""
+        text = paragraph.text.strip()
+        return text.startswith('表') or text.lower().startswith('table')
+
+    def _format_figure_caption(self, paragraph):
+        """格式化图片标题"""
+        try:
+            # 获取标题文本
+            text = paragraph.text.strip()
+            
+            # 清除现有格式
+            paragraph.clear()
+            
+            # 应用新格式
+            run = paragraph.add_run(text)
+            font = run.font
+            font.size = Pt(self.format_spec.figure_caption.font_size)
+            font.name = self.format_spec.figure_caption.font_name
+            font.bold = self.format_spec.figure_caption.bold
+            
+            # 设置对齐方式
+            alignment_map = {
+                "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+                "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+                "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+            }
+            paragraph.alignment = alignment_map.get(
+                self.format_spec.figure_caption.alignment,
+                WD_PARAGRAPH_ALIGNMENT.CENTER
+            )
+            
+            # 设置段落间距
+            paragraph.paragraph_format.space_before = Pt(self.format_spec.figure_caption.space_before)
+            paragraph.paragraph_format.space_after = Pt(self.format_spec.figure_caption.space_after)
+            
+        except Exception as e:
+            print(f"格式化图片标题时出错: {str(e)}")
+
+    def _format_table_caption(self, paragraph):
+        """格式化表格标题"""
+        try:
+            # 获取标题文本
+            text = paragraph.text.strip()
+            
+            # 清除现有格式
+            paragraph.clear()
+            
+            # 应用新格式
+            run = paragraph.add_run(text)
+            font = run.font
+            font.size = Pt(self.format_spec.table_caption.font_size)
+            font.name = self.format_spec.table_caption.font_name
+            font.bold = self.format_spec.table_caption.bold
+            
+            # 设置对齐方式
+            alignment_map = {
+                "LEFT": WD_PARAGRAPH_ALIGNMENT.LEFT,
+                "CENTER": WD_PARAGRAPH_ALIGNMENT.CENTER,
+                "RIGHT": WD_PARAGRAPH_ALIGNMENT.RIGHT
+            }
+            paragraph.alignment = alignment_map.get(
+                self.format_spec.table_caption.alignment,
+                WD_PARAGRAPH_ALIGNMENT.CENTER
+            )
+            
+            # 设置段落间距
+            paragraph.paragraph_format.space_before = Pt(self.format_spec.table_caption.space_before)
+            paragraph.paragraph_format.space_after = Pt(self.format_spec.table_caption.space_after)
+            
+        except Exception as e:
+            print(f"格式化表格标题时出错: {str(e)}")
     
