@@ -101,11 +101,13 @@ class PreviewPage(QWidget):
         try:
             print("开始更新预览...")
             
-            # 保存原始文档
+            # 保存原始文档的副本
             original_docx = os.path.join(self.temp_dir, "original.docx")
             print(f"保存原始文档到: {original_docx}")
             try:
-                self.main_window.document.doc.save(original_docx)
+                # 创建原始文档的副本
+                import shutil
+                shutil.copy2(self.main_window.document.path, original_docx)
             except Exception as e:
                 print(f"保存原始文档失败: {str(e)}")
                 raise
@@ -127,22 +129,30 @@ class PreviewPage(QWidget):
                 print(f"显示原始文档预览失败: {str(e)}")
                 raise
             
-            # 创建格式化文档的副本
+            # 创建并格式化新文档
             formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
-            print(f"创建格式化文档副本: {formatted_docx}")
+            print(f"创建格式化文档: {formatted_docx}")
             try:
-                # 创建文档副本
-                import shutil
+                # 复制原始文档
                 shutil.copy2(original_docx, formatted_docx)
                 
-                # 加载副本并应用格式
+                # 创建新的Document对象
                 from docx import Document
                 formatted_doc = Document(formatted_docx)
+                
+                # 保存当前文档对象
+                original_doc = self.main_window.document.doc
+                
+                # 临时替换文档对象进行格式化
                 self.main_window.document.doc = formatted_doc
                 self.main_window.formatter.format()
                 formatted_doc.save(formatted_docx)
+                
+                # 恢复原始文档对象
+                self.main_window.document.doc = original_doc
+                
             except Exception as e:
-                print(f"创建和格式化文档副本失败: {str(e)}")
+                print(f"格式化文档失败: {str(e)}")
                 raise
             
             # 转换格式化后的文档为PDF
