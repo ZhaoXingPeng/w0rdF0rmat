@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 import json
 import yaml
@@ -24,59 +24,37 @@ class TableCellFormat:
     bold: bool = False
     italic: bool = False
     alignment: str = "CENTER"
-    vertical_alignment: str = "CENTER"  # TOP, CENTER, BOTTOM
-    text_color: str = "000000"  # RGB格式
-    background_color: str = None  # RGB格式，None表示无背景色
+    vertical_alignment: str = "CENTER"
+    text_color: str = "000000"
+    background_color: Optional[str] = None
     line_spacing: float = 1.0
 
 @dataclass
 class TableFormat:
     """表格格式定义"""
-    style: str = "DEFAULT"  # 表格样式：DEFAULT, THREE_LINE, GRID
-    width: float = None  # 表格宽度（磅值），None表示自适应
-    alignment: str = "CENTER"  # 表格整体对齐方式
-    
-    # 表头格式
-    header_format: TableCellFormat = None
-    # 数据单元格格式
-    data_format: TableCellFormat = None
-    
-    # 行高和列宽
-    row_height: float = 12  # 默认行高（磅值）
-    col_width: float = 100  # 默认列宽（磅值）
-    auto_fit: bool = True  # 是否自动调整大小
-    
-    # 边框设置
-    border_size: float = 1.0  # 边框粗细（磅值）
-    border_color: str = "000000"  # 边框颜色（RGB格式）
-    borders: Dict[str, bool] = None  # 边框显示设置
-    
-    # 间距设置
-    cell_padding: float = 2  # 单元格内边距（磅值）
-    spacing_before: float = 6  # 表格前间距
-    spacing_after: float = 6  # 表格后间距
-
-    def __post_init__(self):
-        if self.borders is None:
-            self.borders = {
-                "top": True,
-                "bottom": True,
-                "left": True,
-                "right": True,
-                "inside_h": True,
-                "inside_v": True
-            }
-        if self.header_format is None:
-            self.header_format = TableCellFormat(
-                font_size=10.5,
-                bold=True,
-                alignment="CENTER"
-            )
-        if self.data_format is None:
-            self.data_format = TableCellFormat(
-                font_size=10.5,
-                alignment="LEFT"
-            )
+    style: str = "DEFAULT"
+    alignment: str = "CENTER"
+    width: Optional[float] = None
+    header_format: TableCellFormat = field(default_factory=lambda: TableCellFormat(
+        font_size=10.5,
+        font_name="Times New Roman",
+        bold=True,
+        alignment="CENTER"
+    ))
+    data_format: TableCellFormat = field(default_factory=lambda: TableCellFormat(
+        font_size=10.5,
+        font_name="Times New Roman",
+        bold=False,
+        alignment="LEFT"
+    ))
+    row_height: float = 12
+    col_width: float = 100
+    auto_fit: bool = True
+    border_size: float = 1.0
+    border_color: str = "000000"
+    cell_padding: float = 2
+    spacing_before: float = 6
+    spacing_after: float = 6
 
 @dataclass
 class ImageFormat:

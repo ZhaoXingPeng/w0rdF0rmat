@@ -114,14 +114,6 @@ tables:
   
   border_size: 1.0
   border_color: "000000"
-  borders:
-    top: true
-    bottom: true
-    left: true
-    right: true
-    inside_h: true
-    inside_v: true
-  
   cell_padding: 2
   spacing_before: 6
   spacing_after: 6

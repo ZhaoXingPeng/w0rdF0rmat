@@ -1,9 +1,10 @@
-from docx.shared import Pt, Inches, Cm, Mm
+from docx.shared import Pt, Inches, Cm
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.table import _Cell, _Row, _Column
 from docx.shared import RGBColor
-from docx.oxml import parse_xml
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.section import WD_SECTION, WD_ORIENT
 from .format_spec import (
@@ -15,6 +16,10 @@ from .format_spec import (
     ImageFormat,
     PageSetupFormat
 )
+from docx.oxml import register_element_cls
+from docx.oxml.ns import qn, nsdecls
+from docx.oxml import parse_xml
+from docx.oxml.shared import OxmlElement
 
 class WordFormatter:
     def __init__(self, document, config_manager):
@@ -293,79 +298,52 @@ class WordFormatter:
             # 首先清除表格的所有样式
             table.style = None
             
-            # 保存原始数据
-            original_data = []
-            for row in table.rows:
-                row_data = []
-                for cell in row.cells:
-                    row_data.append(cell.text.strip())
-                original_data.append(row_data)
-            
-            # 清除所有单元格的格式和边框
+            # 清除所有边框
             for row in table.rows:
                 for cell in row.cells:
-                    # 清除单元格边框
-                    cell._tc.get_or_add_tcPr().append(parse_xml(r'''
-                        <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                            <w:top w:val="none"/>
-                            <w:left w:val="none"/>
-                            <w:bottom w:val="none"/>
-                            <w:right w:val="none"/>
-                            <w:insideH w:val="none"/>
-                            <w:insideV w:val="none"/>
-                        </w:tcBorders>
-                    '''))
+                    for border_position in ['top', 'bottom', 'left', 'right']:
+                        self._set_cell_border(cell, border_position, False)
             
-            # 重新添加内容并设置格式
-            for i, row in enumerate(table.rows):
-                for j, cell in enumerate(row.cells):
-                    # 确保至少有一个段落
-                    if not cell.paragraphs:
-                        cell._tc.append(parse_xml('<w:p/>'))
-                    
-                    paragraph = cell.paragraphs[0]
-                    paragraph.clear()  # 清除段落内容
-                    
-                    # 添加文本
-                    run = paragraph.add_run(original_data[i][j])
-                    
-                    # 设置字体格式
-                    font = run.font
-                    font.size = Pt(self.format_spec.tables.font_size)
-                    font.name = self.format_spec.tables.font_name
-                    
-                    # 表头加粗并居中
-                    if i == 0:
-                        font.bold = True
-                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    else:
-                        font.bold = False
-                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-            
-            # 添加三线表的边框
+            # 添加三条主要横线
             # 顶线
             for cell in table.rows[0].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
-                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:top w:val="single" w:sz="12" w:space="0"/>
-                    </w:tcBorders>
-                '''))
+                self._set_cell_border(cell, "top", True)
             
             # 表头下横线
             for cell in table.rows[0].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
-                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:bottom w:val="single" w:sz="12" w:space="0"/>
-                    </w:tcBorders>
-                '''))
+                self._set_cell_border(cell, "bottom", True)
             
             # 底线
             for cell in table.rows[-1].cells:
-                cell._tc.get_or_add_tcPr().append(parse_xml(r'''
-                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:bottom w:val="single" w:sz="12" w:space="0"/>
-                    </w:tcBorders>
-                '''))
+                self._set_cell_border(cell, "bottom", True)
+            
+            # 设置单元格格式
+            for i, row in enumerate(table.rows):
+                for cell in row.cells:
+                    # 保存原始文本
+                    text = cell.text.strip()
+                    
+                    # 清除现有内容
+                    cell.text = ""
+                    paragraph = cell.paragraphs[0]
+                    
+                    # 添加新的文本
+                    run = paragraph.add_run(text)
+                    
+                    # 设置字体格式
+                    font = run.font
+                    if i == 0:
+                        # 使用表头格式
+                        font.size = Pt(self.format_spec.tables.header_format.font_size)
+                        font.name = self.format_spec.tables.header_format.font_name
+                        font.bold = self.format_spec.tables.header_format.bold
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                    else:
+                        # 使用数据格式
+                        font.size = Pt(self.format_spec.tables.data_format.font_size)
+                        font.name = self.format_spec.tables.data_format.font_name
+                        font.bold = self.format_spec.tables.data_format.bold
+                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
                 
         except Exception as e:
             print(f"应用三线表样式时出错: {str(e)}")
@@ -376,48 +354,35 @@ class WordFormatter:
             # 首先清除表格的所有样式
             table.style = None
             
-            # 保存原始数据
-            original_data = []
+            # 设置所有单元格的边框
             for row in table.rows:
-                row_data = []
                 for cell in row.cells:
-                    row_data.append(cell.text.strip())
-                original_data.append(row_data)
-            
-            # 清除并重新设置所有单元格的格式
-            for i, row in enumerate(table.rows):
-                for j, cell in enumerate(row.cells):
-                    # 确保至少有一个段落
-                    if not cell.paragraphs:
-                        cell._tc.append(parse_xml('<w:p/>'))
+                    for border_position in ['top', 'bottom', 'left', 'right']:
+                        self._set_cell_border(cell, border_position, True)
                     
+                    # 保存原始文本
+                    text = cell.text.strip()
+                    
+                    # 清除现有内容
+                    cell.text = ""
                     paragraph = cell.paragraphs[0]
-                    paragraph.clear()  # 清除段落内容
                     
-                    # 添加文本
-                    run = paragraph.add_run(original_data[i][j])
+                    # 添加新的文本
+                    run = paragraph.add_run(text)
                     
                     # 设置字体格式
                     font = run.font
-                    font.size = Pt(self.format_spec.tables.font_size)
-                    font.name = self.format_spec.tables.font_name
+                    if row == table.rows[0]:  # 表头行
+                        font.size = Pt(self.format_spec.tables.header_format.font_size)
+                        font.name = self.format_spec.tables.header_format.font_name
+                        font.bold = self.format_spec.tables.header_format.bold
+                    else:  # 数据行
+                        font.size = Pt(self.format_spec.tables.data_format.font_size)
+                        font.name = self.format_spec.tables.data_format.font_name
+                        font.bold = self.format_spec.tables.data_format.bold
                     
-                    # 表头加粗并居中
-                    if i == 0:
-                        font.bold = True
-                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    else:
-                        paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-                    
-                    # 设置网格边框
-                    cell._tc.get_or_add_tcPr().append(parse_xml(r'''
-                        <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                            <w:top w:val="single" w:sz="4" w:space="0"/>
-                            <w:left w:val="single" w:sz="4" w:space="0"/>
-                            <w:bottom w:val="single" w:sz="4" w:space="0"/>
-                            <w:right w:val="single" w:sz="4" w:space="0"/>
-                        </w:tcBorders>
-                    '''))
+                    # 设置对齐方式
+                    paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
                     
         except Exception as e:
             print(f"应用网格表样式时出错: {str(e)}")
@@ -433,11 +398,29 @@ class WordFormatter:
         # 设置单元格格式
         for i, row in enumerate(table.rows):
             for cell in row.cells:
-                self._format_table_cell(cell,
-                    bold=(i == 0),
-                    font_size=self.format_spec.tables.font_size,
-                    font_name=self.format_spec.tables.font_name
-                )
+                # 保存原始文本
+                text = cell.text.strip()
+                
+                # 清除现有内容
+                cell.text = ""
+                paragraph = cell.paragraphs[0]
+                
+                # 添加新的文本
+                run = paragraph.add_run(text)
+                
+                # 设置字体格式
+                font = run.font
+                if i == 0:  # 表头行
+                    font.size = Pt(self.format_spec.tables.header_format.font_size)
+                    font.name = self.format_spec.tables.header_format.font_name
+                    font.bold = self.format_spec.tables.header_format.bold
+                else:  # 数据行
+                    font.size = Pt(self.format_spec.tables.data_format.font_size)
+                    font.name = self.format_spec.tables.data_format.font_name
+                    font.bold = self.format_spec.tables.data_format.bold
+                
+                # 设置对齐方式
+                paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     def _format_table_cell(self, cell, format_spec: TableCellFormat):
         """
@@ -541,24 +524,30 @@ class WordFormatter:
         """清除表格所有边框"""
         for row in table.rows:
             for cell in row.cells:
-                for border in cell._tc.get_or_add_tcPr().xpath('./w:tcBorders/*'):
-                    border.getparent().remove(border)
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcBorders = tcPr.xpath('./w:tcBorders')
+                if tcBorders:
+                    for border in tcBorders[0].getchildren():
+                        tcBorders[0].remove(border)
 
     def _set_row_border(self, row, border_position, enabled):
         """设置行的边框"""
         for cell in row.cells:
-            tcPr = cell._tc.get_or_add_tcPr()
-            tcBorders = tcPr.get_or_add_tcBorders()
-            border = getattr(tcBorders, f"get_or_add_{border_position}")()
-            border.val = 'single' if enabled else 'nil'
+            self._set_cell_border(cell, border_position, enabled)
 
     def _set_outer_borders(self, table):
         """设置表格外边框"""
+        # 设置第一行和最后一行的上下边框
+        for cell in table.rows[0].cells:
+            self._set_cell_border(cell, "top", True)
+        for cell in table.rows[-1].cells:
+            self._set_cell_border(cell, "bottom", True)
+        
+        # 设置左右边框
         for row in table.rows:
-            self._set_row_border(row, "left", True)
-            self._set_row_border(row, "right", True)
-        self._set_row_border(table.rows[0], "top", True)
-        self._set_row_border(table.rows[-1], "bottom", True)
+            self._set_cell_border(row.cells[0], "left", True)
+            self._set_cell_border(row.cells[-1], "right", True)
 
     def _set_all_borders(self, table):
         """设置表格所有边框"""
@@ -569,10 +558,37 @@ class WordFormatter:
 
     def _set_cell_border(self, cell, border_position, enabled):
         """设置单元格边框"""
-        tcPr = cell._tc.get_or_add_tcPr()
-        tcBorders = tcPr.get_or_add_tcBorders()
-        border = getattr(tcBorders, f"get_or_add_{border_position}")()
-        border.val = 'single' if enabled else 'nil'
+        try:
+            tc = cell._tc
+            tcPr = tc.get_or_add_tcPr()
+            
+            # 获取现有的tcBorders元素，如果不存在则创建
+            tcBorders = tcPr.xpath('./w:tcBorders')
+            if not tcBorders:
+                tcBorders = OxmlElement('w:tcBorders')
+                tcBorders.set(nsdecls('w'), '')  # 正确设置命名空间
+                tcPr.append(tcBorders)
+            else:
+                tcBorders = tcBorders[0]
+            
+            # 移除现有的特定边框设置
+            existing = tcBorders.xpath(f'./w:{border_position}')
+            if existing:
+                for e in existing:
+                    tcBorders.remove(e)
+            
+            # 创建新的边框元素
+            border = OxmlElement(f'w:{border_position}')
+            border.set(qn('w:val'), 'single' if enabled else 'nil')
+            border.set(qn('w:sz'), '4')
+            border.set(qn('w:space'), '0')
+            border.set(qn('w:color'), 'auto')
+            
+            # 添加边框元素
+            tcBorders.append(border)
+            
+        except Exception as e:
+            print(f"设置边框失败: {str(e)}")
     
     def format_images(self):
         """格式化文档中的所有图片"""
