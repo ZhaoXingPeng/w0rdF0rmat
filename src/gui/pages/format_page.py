@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QComboBox,
     QTabWidget, QFormLayout, QSpinBox,
-    QLineEdit, QCheckBox, QFileDialog
+    QLineEdit, QCheckBox, QFileDialog,
+    QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt
 
@@ -34,6 +35,7 @@ class FormatPage(QWidget):
         self.add_body_tab()
         self.add_table_tab()
         self.add_image_tab()
+        self.add_page_tab()
         
         layout.addWidget(self.tab_widget)
         
@@ -47,22 +49,144 @@ class FormatPage(QWidget):
         title_widget = QWidget()
         layout = QFormLayout(title_widget)
         
-        # 添加各种设置选项
+        # 字号设置
         self.title_size = QSpinBox()
         self.title_size.setRange(8, 72)
         self.title_size.setValue(16)
         layout.addRow('字号:', self.title_size)
         
+        # 字体设置
         self.title_font = QLineEdit('Times New Roman')
         layout.addRow('字体:', self.title_font)
         
+        # 样式设置
         self.title_bold = QCheckBox('加粗')
         self.title_bold.setChecked(True)
-        layout.addRow('样式:', self.title_bold)
+        self.title_italic = QCheckBox('斜体')
+        style_layout = QHBoxLayout()
+        style_layout.addWidget(self.title_bold)
+        style_layout.addWidget(self.title_italic)
+        layout.addRow('样式:', style_layout)
+        
+        # 对齐方式
+        self.title_alignment = QComboBox()
+        self.title_alignment.addItems(['左对齐', '居中', '右对齐'])
+        self.title_alignment.setCurrentText('居中')
+        layout.addRow('对齐:', self.title_alignment)
         
         self.tab_widget.addTab(title_widget, '标题')
     
-    # ... 添加其他选项卡的方法 ...
+    def add_body_tab(self):
+        """添加正文设置选项卡"""
+        body_widget = QWidget()
+        layout = QFormLayout(body_widget)
+        
+        # 字号设置
+        self.body_size = QSpinBox()
+        self.body_size.setRange(8, 72)
+        self.body_size.setValue(12)
+        layout.addRow('字号:', self.body_size)
+        
+        # 字体设置
+        self.body_font = QLineEdit('Times New Roman')
+        layout.addRow('字体:', self.body_font)
+        
+        # 行距设置
+        self.body_line_spacing = QDoubleSpinBox()
+        self.body_line_spacing.setRange(1.0, 3.0)
+        self.body_line_spacing.setValue(1.5)
+        self.body_line_spacing.setSingleStep(0.1)
+        layout.addRow('行距:', self.body_line_spacing)
+        
+        # 首行缩进
+        self.body_indent = QSpinBox()
+        self.body_indent.setRange(0, 72)
+        self.body_indent.setValue(24)
+        layout.addRow('首行缩进:', self.body_indent)
+        
+        self.tab_widget.addTab(body_widget, '正文')
+    
+    def add_table_tab(self):
+        """添加表格设置选项卡"""
+        table_widget = QWidget()
+        layout = QFormLayout(table_widget)
+        
+        # 表格样式
+        self.table_style = QComboBox()
+        self.table_style.addItems(['默认样式', '三线表', '网格表'])
+        layout.addRow('表格样式:', self.table_style)
+        
+        # 字号设置
+        self.table_size = QSpinBox()
+        self.table_size.setRange(8, 72)
+        self.table_size.setValue(10.5)
+        layout.addRow('字号:', self.table_size)
+        
+        # 表头设置
+        self.table_header_bold = QCheckBox('表头加粗')
+        self.table_header_bold.setChecked(True)
+        layout.addRow('表头样式:', self.table_header_bold)
+        
+        self.tab_widget.addTab(table_widget, '表格')
+    
+    def add_image_tab(self):
+        """添加图片设置选项卡"""
+        image_widget = QWidget()
+        layout = QFormLayout(image_widget)
+        
+        # 图片对齐方式
+        self.image_alignment = QComboBox()
+        self.image_alignment.addItems(['左对齐', '居中', '右对齐'])
+        self.image_alignment.setCurrentText('居中')
+        layout.addRow('对齐:', self.image_alignment)
+        
+        # 图注设置
+        self.caption_size = QSpinBox()
+        self.caption_size.setRange(8, 72)
+        self.caption_size.setValue(10.5)
+        layout.addRow('图注字号:', self.caption_size)
+        
+        self.tab_widget.addTab(image_widget, '图片')
+    
+    def add_page_tab(self):
+        """添加页面设置选项卡"""
+        page_widget = QWidget()
+        layout = QFormLayout(page_widget)
+        
+        # 页边距设置
+        margin_layout = QHBoxLayout()
+        self.margin_top = QSpinBox()
+        self.margin_top.setRange(0, 100)
+        self.margin_top.setValue(25)
+        margin_layout.addWidget(QLabel('上:'))
+        margin_layout.addWidget(self.margin_top)
+        
+        self.margin_bottom = QSpinBox()
+        self.margin_bottom.setRange(0, 100)
+        self.margin_bottom.setValue(25)
+        margin_layout.addWidget(QLabel('下:'))
+        margin_layout.addWidget(self.margin_bottom)
+        
+        self.margin_left = QSpinBox()
+        self.margin_left.setRange(0, 100)
+        self.margin_left.setValue(30)
+        margin_layout.addWidget(QLabel('左:'))
+        margin_layout.addWidget(self.margin_left)
+        
+        self.margin_right = QSpinBox()
+        self.margin_right.setRange(0, 100)
+        self.margin_right.setValue(30)
+        margin_layout.addWidget(QLabel('右:'))
+        margin_layout.addWidget(self.margin_right)
+        
+        layout.addRow('页边距:', margin_layout)
+        
+        # 纸张方向
+        self.page_orientation = QComboBox()
+        self.page_orientation.addItems(['纵向', '横向'])
+        layout.addRow('纸张方向:', self.page_orientation)
+        
+        self.tab_widget.addTab(page_widget, '页面')
     
     def on_format_changed(self, text):
         """处理格式选择变化"""
