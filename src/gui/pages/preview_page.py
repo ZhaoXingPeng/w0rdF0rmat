@@ -95,81 +95,160 @@ class PreviewPage(QWidget):
     def update_preview(self):
         """更新预览内容"""
         if not self.main_window.document:
+            print("无法更新预览：文档未加载")
             return
-            
+        
         try:
+            print("开始更新预览...")
+            
             # 保存原始文档
             original_docx = os.path.join(self.temp_dir, "original.docx")
-            self.main_window.document.doc.save(original_docx)
+            print(f"保存原始文档到: {original_docx}")
+            try:
+                self.main_window.document.doc.save(original_docx)
+            except Exception as e:
+                print(f"保存原始文档失败: {str(e)}")
+                raise
             
             # 转换原始文档为PDF
             original_pdf = os.path.join(self.temp_dir, "original.pdf")
-            self.convert_word_to_pdf(original_docx, original_pdf)
+            print(f"转换原始文档为PDF: {original_pdf}")
+            try:
+                self.convert_word_to_pdf(original_docx, original_pdf)
+            except Exception as e:
+                print(f"转换原始文档为PDF失败: {str(e)}")
+                raise
             
             # 显示原始文档
-            self.show_pdf_preview(original_pdf, self.original_layout)
+            print("显示原始文档预览")
+            try:
+                self.show_pdf_preview(original_pdf, self.original_layout)
+            except Exception as e:
+                print(f"显示原始文档预览失败: {str(e)}")
+                raise
             
-            # 应用格式化
+            # 创建格式化文档的副本
             formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
-            self.main_window.formatter.format()
-            self.main_window.document.save(formatted_docx)
+            print(f"创建格式化文档副本: {formatted_docx}")
+            try:
+                # 创建文档副本
+                import shutil
+                shutil.copy2(original_docx, formatted_docx)
+                
+                # 加载副本并应用格式
+                from docx import Document
+                formatted_doc = Document(formatted_docx)
+                self.main_window.document.doc = formatted_doc
+                self.main_window.formatter.format()
+                formatted_doc.save(formatted_docx)
+            except Exception as e:
+                print(f"创建和格式化文档副本失败: {str(e)}")
+                raise
             
             # 转换格式化后的文档为PDF
             formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
-            self.convert_word_to_pdf(formatted_docx, formatted_pdf)
+            print(f"转换格式化文档为PDF: {formatted_pdf}")
+            try:
+                self.convert_word_to_pdf(formatted_docx, formatted_pdf)
+            except Exception as e:
+                print(f"转换格式化文档为PDF失败: {str(e)}")
+                raise
             
             # 显示格式化后的文档
-            self.show_pdf_preview(formatted_pdf, self.formatted_layout)
+            print("显示格式化文档预览")
+            try:
+                self.show_pdf_preview(formatted_pdf, self.formatted_layout)
+            except Exception as e:
+                print(f"显示格式化文档预览失败: {str(e)}")
+                raise
+            
+            print("预览更新完成")
             
         except Exception as e:
-            self.main_window.show_message(f"更新预览失败: {str(e)}", error=True)
+            error_msg = f"更新预览失败: {str(e)}"
+            print(error_msg)
+            self.main_window.show_message(error_msg, error=True)
+            
+            # 显示错误提示
+            for layout in [self.original_layout, self.formatted_layout]:
+                # 清除现有内容
+                for i in reversed(range(layout.count())): 
+                    widget = layout.itemAt(i).widget()
+                    if widget is not None:
+                        widget.setParent(None)
+                
+                # 添加错误提示
+                error_label = QLabel("预览加载失败")
+                error_label.setStyleSheet("""
+                    QLabel {
+                        color: #dc3545;
+                        font-size: 14px;
+                        padding: 20px;
+                        background-color: #fff;
+                        border: 1px solid #dc3545;
+                        border-radius: 4px;
+                    }
+                """)
+                error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.addWidget(error_label)
     
     def show_pdf_preview(self, pdf_path, target_layout):
         """显示PDF预览"""
-        # 清除现有内容
-        for i in reversed(range(target_layout.count())): 
-            widget = target_layout.itemAt(i).widget()
-            if widget is not None:
-                widget.setParent(None)
+        print(f"开始显示PDF预览: {pdf_path}")
         
-        # 使用PyMuPDF渲染PDF页面
-        doc = fitz.open(pdf_path)
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+        try:
+            # 清除现有内容
+            for i in reversed(range(target_layout.count())): 
+                widget = target_layout.itemAt(i).widget()
+                if widget is not None:
+                    widget.setParent(None)
             
-            # 将页面转换为QImage
-            img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(img)
+            # 使用PyMuPDF渲染PDF页面
+            doc = fitz.open(pdf_path)
+            print(f"PDF页数: {len(doc)}")
             
-            # 创建页面容器
-            page_container = QFrame()
-            page_container.setStyleSheet("""
-                QFrame {
-                    background-color: white;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    margin: 10px;
-                }
-            """)
-            page_layout = QVBoxLayout(page_container)
-            page_layout.setContentsMargins(20, 20, 20, 20)
+            for page_num in range(len(doc)):
+                print(f"渲染第 {page_num + 1} 页")
+                page = doc[page_num]
+                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                
+                # 将页面转换为QImage
+                img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+                pixmap = QPixmap.fromImage(img)
+                
+                # 创建页面容器
+                page_container = QFrame()
+                page_container.setStyleSheet("""
+                    QFrame {
+                        background-color: white;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        margin: 10px;
+                    }
+                """)
+                page_layout = QVBoxLayout(page_container)
+                page_layout.setContentsMargins(20, 20, 20, 20)
+                
+                # 创建标签显示页面
+                page_label = QLabel()
+                page_label.setPixmap(pixmap)
+                page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                page_layout.addWidget(page_label)
+                
+                # 添加页码
+                page_number = QLabel(f"第 {page_num + 1} 页")
+                page_number.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                page_number.setStyleSheet("color: #666; padding: 5px;")
+                page_layout.addWidget(page_number)
+                
+                target_layout.addWidget(page_container)
             
-            # 创建标签显示页面
-            page_label = QLabel()
-            page_label.setPixmap(pixmap)
-            page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            page_layout.addWidget(page_label)
+            doc.close()
+            print("PDF预览显示完成")
             
-            # 添加页码
-            page_number = QLabel(f"第 {page_num + 1} 页")
-            page_number.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            page_number.setStyleSheet("color: #666; padding: 5px;")
-            page_layout.addWidget(page_number)
-            
-            target_layout.addWidget(page_container)
-        
-        doc.close()
+        except Exception as e:
+            print(f"显示PDF预览失败: {str(e)}")
+            raise
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
         """将Word文档转换为PDF"""
