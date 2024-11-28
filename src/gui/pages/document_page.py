@@ -15,19 +15,20 @@ import fitz  # PyMuPDF
 from src.core.document import Document
 from src.core.formatter import WordFormatter
 from src.config.config_manager import ConfigManager
+from src.gui.components.loading_indicator import LoadingIndicator
 
 class DocumentPage(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
         self.config_manager = ConfigManager()
-        self.temp_dir = tempfile.mkdtemp()  # 创建临时目录
+        self.temp_dir = tempfile.mkdtemp()
         self.init_ui()
         
     def init_ui(self):
         """初始化用户界面"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
+        layout.setContentsMargins(0, 0, 0, 0)
         
         # 顶部工具栏
         toolbar = QFrame()
@@ -71,7 +72,7 @@ class DocumentPage(QWidget):
         # 创建预览区域布局
         self.preview_layout = QVBoxLayout(preview_container)
         self.preview_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.preview_layout.setSpacing(20)  # 设置页面之间的间距
+        self.preview_layout.setSpacing(20)
         
         # 创建滚动区域
         self.scroll_area = QScrollArea()
@@ -85,16 +86,19 @@ class DocumentPage(QWidget):
             QScrollBar:vertical {
                 border: none;
                 background: #f0f0f0;
-                width: 10px;
+                width: 8px;
                 margin: 0px;
             }
             QScrollBar::handle:vertical {
                 background: #c1c1c1;
                 min-height: 30px;
-                border-radius: 5px;
+                border-radius: 4px;
             }
             QScrollBar::handle:vertical:hover {
                 background: #a8a8a8;
+            }
+            QScrollBar:horizontal {
+                height: 0px;  /* 隐藏水平滚动条 */
             }
         """)
         
@@ -104,7 +108,7 @@ class DocumentPage(QWidget):
         self.preview_label.setStyleSheet("""
             QLabel {
                 color: #666;
-                font-size: 16px;
+                font-size: 14px;
                 padding: 40px;
                 background-color: white;
                 border: 2px dashed #ddd;
@@ -147,7 +151,7 @@ class DocumentPage(QWidget):
         """显示文档内容"""
         if not self.main_window.document:
             return
-        
+            
         try:
             # 清除现有内容
             self.preview_label.hide()
@@ -156,8 +160,15 @@ class DocumentPage(QWidget):
                 if widget is not None:
                     widget.setParent(None)
             
-            # 计算可用宽度（考虑边距和滚动条）
-            available_width = self.scroll_area.width() - 40  # 减去左右边距
+            # 显示加载指示器
+            loading = LoadingIndicator(self)
+            self.preview_layout.addWidget(loading, alignment=Qt.AlignmentFlag.AlignCenter)
+            loading.start()
+            
+            # 计算可用宽度（考虑边距和居中显示）
+            window_width = self.window().width()
+            content_width = int(window_width * 0.7)  # 使用窗口宽度的70%
+            margin = (window_width - content_width) // 2  # 计算左右边距
             
             # 保存临时文件
             temp_docx = os.path.join(self.temp_dir, "temp.docx")
@@ -167,13 +178,17 @@ class DocumentPage(QWidget):
             pdf_path = os.path.join(self.temp_dir, "temp.pdf")
             self.convert_word_to_pdf(temp_docx, pdf_path)
             
+            # 移除加载指示器
+            loading.stop()
+            loading.setParent(None)
+            
             # 使用PyMuPDF渲染PDF页面
             doc = fitz.open(pdf_path)
             for page_num in range(len(doc)):
                 page = doc[page_num]
                 
                 # 计算缩放比例以适应宽度
-                zoom = available_width / page.rect.width
+                zoom = content_width / page.rect.width
                 pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
                 
                 # 将页面转换为QImage
@@ -187,11 +202,10 @@ class DocumentPage(QWidget):
                         background-color: white;
                         border: 1px solid #ddd;
                         border-radius: 5px;
-                        margin: 10px;
                     }
                 """)
                 page_layout = QVBoxLayout(page_container)
-                page_layout.setContentsMargins(10, 10, 10, 10)
+                page_layout.setContentsMargins(20, 20, 20, 20)
                 
                 # 创建标签显示页面
                 page_label = QLabel()
@@ -205,8 +219,9 @@ class DocumentPage(QWidget):
                 page_number.setStyleSheet("color: #666; padding: 5px;")
                 page_layout.addWidget(page_number)
                 
+                # 添加页面容器到布局，并设置边距
                 self.preview_layout.addWidget(page_container)
-            
+                
             doc.close()
             
         except Exception as e:
