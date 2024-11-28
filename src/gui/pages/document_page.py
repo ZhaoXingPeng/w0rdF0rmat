@@ -56,21 +56,21 @@ class DocumentPage(QWidget):
         layout.addWidget(toolbar)
         
         # 创建预览区域容器
-        preview_container = QWidget()
-        preview_container.setStyleSheet("""
+        self.preview_container = QWidget()
+        self.preview_container.setStyleSheet("""
             QWidget {
                 background-color: #f8f9fa;
             }
         """)
         
         # 创建预览区域布局
-        self.preview_layout = QVBoxLayout(preview_container)
+        self.preview_layout = QVBoxLayout(self.preview_container)
         self.preview_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.preview_layout.setSpacing(20)  # 设置页面之间的间距
         
         # 创建滚动区域
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidget(preview_container)
+        self.scroll_area.setWidget(self.preview_container)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("""
             QScrollArea {
@@ -160,22 +160,11 @@ class DocumentPage(QWidget):
                         border: 1px solid #ddd;
                         padding: 20px;
                         border-radius: 5px;
-                    }
-                """)
-                page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                
-                # 添加阴影效果
-                shadow = """
-                    QLabel {
-                        background-color: white;
-                        border: 1px solid #ddd;
-                        border-radius: 5px;
-                        padding: 20px;
                         margin: 10px;
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
                     }
-                """
-                page_label.setStyleSheet(shadow)
+                """)
+                page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 
                 self.preview_layout.addWidget(page_label)
             
@@ -207,21 +196,4 @@ class DocumentPage(QWidget):
                 os.remove(os.path.join(self.temp_dir, file))
             os.rmdir(self.temp_dir)
         except Exception as e:
-            print(f"清理临时文件失败: {str(e)}")
-    
-    def show_document_content(self):
-        """显示文档内容"""
-        if not self.main_window.document:
-            return
-            
-        # 将文档内容转换为HTML
-        html_content = []
-        for para in self.main_window.document.doc.paragraphs:
-            # 保持段落格式
-            style = para.style
-            if style.name.startswith('Heading'):
-                html_content.append(f'<h{style.name[-1]}>{para.text}</h{style.name[-1]}>')
-            else:
-                html_content.append(f'<p>{para.text}</p>')
-        
-        self.preview.setHtml('\n'.join(html_content)) 
+            print(f"清理临时文件失败: {str(e)}") 
