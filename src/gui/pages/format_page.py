@@ -221,13 +221,18 @@ class FormatPage(QWidget):
             return
         
         try:
+            print("开始应用格式...")
             # 应用格式
             self.main_window.formatter.format()
-            self.main_window.show_message("格式已应用")
+            print("格式应用完成")
             
-            # 切换到预览页面
-            self.main_window.stacked_widget.setCurrentWidget(
-                self.main_window.preview_page
-            )
+            # 切换到预览页面并更新预览
+            print("切换到预览页面...")
+            self.main_window.show_preview_page()
+            
+            self.main_window.show_message("格式已应用，请查看预览")
+            
         except Exception as e:
-            self.main_window.show_message(f"应用格式失败: {str(e)}", error=True) 
+            error_msg = f"应用格式失败: {str(e)}"
+            print(error_msg)
+            self.main_window.show_message(error_msg, error=True) 

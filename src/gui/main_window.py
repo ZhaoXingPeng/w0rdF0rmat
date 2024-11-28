@@ -99,9 +99,22 @@ class MainWindow(QMainWindow):
         if not self.document:
             self.show_message("请先打开文档！", error=True)
             return
-        self.stacked_widget.setCurrentWidget(self.preview_page)
-        self.preview_page.update_preview()  # 更新预览内容
-        self.show_message("第三步：预览格式化结果并保存")
+        
+        try:
+            print("切换到预览页面...")
+            self.stacked_widget.setCurrentWidget(self.preview_page)
+            
+            # 强制更新预览
+            print("开始更新预览...")
+            self.preview_page.update_preview()
+            print("预览更新完成")
+            
+            self.show_message("第三步：预览格式化结果并保存")
+            
+        except Exception as e:
+            error_msg = f"预览失败: {str(e)}"
+            print(error_msg)
+            self.show_message(error_msg, error=True)
     
     def update_toolbar_state(self):
         """更新工具栏状态"""

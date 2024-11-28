@@ -99,15 +99,17 @@ class PreviewPage(QWidget):
             return
         
         try:
-            print("开始更新预览...")
+            print("\n=== 开始更新预览 ===")
+            print(f"临时目录: {self.temp_dir}")
             
-            # 保存原始文档的副本
+            # 保存原始文档
             original_docx = os.path.join(self.temp_dir, "original.docx")
             print(f"保存原始文档到: {original_docx}")
             try:
                 # 创建原始文档的副本
                 import shutil
                 shutil.copy2(self.main_window.document.path, original_docx)
+                print("原始文档保存成功")
             except Exception as e:
                 print(f"保存原始文档失败: {str(e)}")
                 raise
@@ -117,6 +119,7 @@ class PreviewPage(QWidget):
             print(f"转换原始文档为PDF: {original_pdf}")
             try:
                 self.convert_word_to_pdf(original_docx, original_pdf)
+                print("原始文档转换为PDF成功")
             except Exception as e:
                 print(f"转换原始文档为PDF失败: {str(e)}")
                 raise
@@ -125,6 +128,7 @@ class PreviewPage(QWidget):
             print("显示原始文档预览")
             try:
                 self.show_pdf_preview(original_pdf, self.original_layout)
+                print("原始文档预览显示成功")
             except Exception as e:
                 print(f"显示原始文档预览失败: {str(e)}")
                 raise
@@ -135,8 +139,9 @@ class PreviewPage(QWidget):
             try:
                 # 复制原始文档
                 shutil.copy2(original_docx, formatted_docx)
+                print("文档副本创建成功")
                 
-                # 创建新的Document对象
+                # 创建新的Document对象并应用格式
                 from docx import Document
                 formatted_doc = Document(formatted_docx)
                 
@@ -145,8 +150,11 @@ class PreviewPage(QWidget):
                 
                 # 临时替换文档对象进行格式化
                 self.main_window.document.doc = formatted_doc
+                print("开始应用格式...")
                 self.main_window.formatter.format()
+                print("格式应用完成")
                 formatted_doc.save(formatted_docx)
+                print("格式化文档保存成功")
                 
                 # 恢复原始文档对象
                 self.main_window.document.doc = original_doc
@@ -160,6 +168,7 @@ class PreviewPage(QWidget):
             print(f"转换格式化文档为PDF: {formatted_pdf}")
             try:
                 self.convert_word_to_pdf(formatted_docx, formatted_pdf)
+                print("格式化文档转换为PDF成功")
             except Exception as e:
                 print(f"转换格式化文档为PDF失败: {str(e)}")
                 raise
@@ -168,11 +177,12 @@ class PreviewPage(QWidget):
             print("显示格式化文档预览")
             try:
                 self.show_pdf_preview(formatted_pdf, self.formatted_layout)
+                print("格式化文档预览显示成功")
             except Exception as e:
                 print(f"显示格式化文档预览失败: {str(e)}")
                 raise
             
-            print("预览更新完成")
+            print("=== 预览更新完成 ===\n")
             
         except Exception as e:
             error_msg = f"更新预览失败: {str(e)}"
@@ -180,27 +190,7 @@ class PreviewPage(QWidget):
             self.main_window.show_message(error_msg, error=True)
             
             # 显示错误提示
-            for layout in [self.original_layout, self.formatted_layout]:
-                # 清除现有内容
-                for i in reversed(range(layout.count())): 
-                    widget = layout.itemAt(i).widget()
-                    if widget is not None:
-                        widget.setParent(None)
-                
-                # 添加错误提示
-                error_label = QLabel("预览加载失败")
-                error_label.setStyleSheet("""
-                    QLabel {
-                        color: #dc3545;
-                        font-size: 14px;
-                        padding: 20px;
-                        background-color: #fff;
-                        border: 1px solid #dc3545;
-                        border-radius: 4px;
-                    }
-                """)
-                error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                layout.addWidget(error_label)
+            self._show_error_preview("预览加载失败")
     
     def show_pdf_preview(self, pdf_path, target_layout):
         """显示PDF预览"""
