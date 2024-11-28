@@ -218,10 +218,18 @@ class FormatSpecParser:
             return None
     
     def _parse_format_data(self, data: dict) -> DocumentFormat:
-        """
-        解析格式数据为DocumentFormat对象
-        """
+        """解析格式数据为DocumentFormat对象"""
         try:
+            # 解析表格格式
+            table_data = data.get('tables', {})
+            header_format = TableCellFormat(**table_data.get('header_format', {}))
+            data_format = TableCellFormat(**table_data.get('data_format', {}))
+            table_format = TableFormat(
+                header_format=header_format,
+                data_format=data_format,
+                **{k: v for k, v in table_data.items() if k not in ['header_format', 'data_format']}
+            )
+            
             return DocumentFormat(
                 title=SectionFormat(**data.get('title', {})),
                 abstract=SectionFormat(**data.get('abstract', {})),
@@ -236,12 +244,7 @@ class FormatSpecParser:
                     "left": 1.25,
                     "right": 1.25
                 }),
-                tables=TableFormat(**data.get('tables', {})),
-                images=ImageFormat(**data.get('images', {})),
-                figure_caption=CaptionFormat(**data.get('figure_caption', {})),
-                table_caption=CaptionFormat(**data.get('table_caption', {})),
-                page_setup=PageSetupFormat(**data.get('page_setup', {})),
-                toc=TOCFormat(**data.get('toc', {}))
+                tables=table_format
             )
         except Exception as e:
             print(f"解析格式数据失败: {str(e)}")

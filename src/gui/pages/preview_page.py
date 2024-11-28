@@ -1,60 +1,96 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QSplitter, QLabel,
-    QFileDialog, QScrollArea
+    QWidget, QVBoxLayout, QPushButton, 
+    QFileDialog, QScrollArea, QLabel,
+    QHBoxLayout, QFrame, QSplitter
 )
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QImage
+from pathlib import Path
 import tempfile
 import os
-from pathlib import Path
-from docx2pdf import convert  # 用于转换docx到pdf
-import pythoncom  # 用于COM组件初始化
-import fitz  # 用于PDF处理
+import win32com.client
+import pythoncom
+import fitz  # PyMuPDF
 
 class PreviewPage(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.temp_dir = tempfile.mkdtemp()  # 创建临时目录
+        self.temp_dir = tempfile.mkdtemp()
         self.init_ui()
         
     def init_ui(self):
         """初始化用户界面"""
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         # 添加标题标签
         title_layout = QHBoxLayout()
-        title_layout.addWidget(QLabel("原始文档"))
-        title_layout.addWidget(QLabel("格式化预览"))
+        original_label = QLabel("原始文档")
+        formatted_label = QLabel("格式化预览")
+        original_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 10px;")
+        formatted_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 10px;")
+        title_layout.addWidget(original_label)
+        title_layout.addWidget(formatted_label)
         layout.addLayout(title_layout)
         
         # 创建分割视图
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # 原始文档视图
+        self.original_scroll = QScrollArea()
         self.original_container = QWidget()
         self.original_layout = QVBoxLayout(self.original_container)
-        original_scroll = QScrollArea()
-        original_scroll.setWidget(self.original_container)
-        original_scroll.setWidgetResizable(True)
-        splitter.addWidget(original_scroll)
+        self.original_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.original_scroll.setWidget(self.original_container)
+        self.original_scroll.setWidgetResizable(True)
+        self.original_scroll.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #ddd;
+                background-color: #f8f9fa;
+            }
+        """)
         
         # 格式化后的视图
+        self.formatted_scroll = QScrollArea()
         self.formatted_container = QWidget()
         self.formatted_layout = QVBoxLayout(self.formatted_container)
-        formatted_scroll = QScrollArea()
-        formatted_scroll.setWidget(self.formatted_container)
-        formatted_scroll.setWidgetResizable(True)
-        splitter.addWidget(formatted_scroll)
+        self.formatted_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.formatted_scroll.setWidget(self.formatted_container)
+        self.formatted_scroll.setWidgetResizable(True)
+        self.formatted_scroll.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #ddd;
+                background-color: #f8f9fa;
+            }
+        """)
+        
+        splitter.addWidget(self.original_scroll)
+        splitter.addWidget(self.formatted_scroll)
+        splitter.setSizes([600, 600])  # 设置初始宽度
         
         layout.addWidget(splitter)
         
-        # 添加保存按钮
+        # 添加底部按钮
+        button_layout = QHBoxLayout()
         self.save_btn = QPushButton('保存文档')
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+        """)
         self.save_btn.clicked.connect(self.save_document)
-        layout.addWidget(self.save_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(self.save_btn)
+        layout.addLayout(button_layout)
     
     def update_preview(self):
         """更新预览内容"""
@@ -62,75 +98,93 @@ class PreviewPage(QWidget):
             return
             
         try:
+            # 保存原始文档
+            original_docx = os.path.join(self.temp_dir, "original.docx")
+            self.main_window.document.doc.save(original_docx)
+            
+            # 转换原始文档为PDF
+            original_pdf = os.path.join(self.temp_dir, "original.pdf")
+            self.convert_word_to_pdf(original_docx, original_pdf)
+            
             # 显示原始文档
-            self.show_original_document()
+            self.show_pdf_preview(original_pdf, self.original_layout)
+            
+            # 应用格式化
+            formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
+            self.main_window.formatter.format()
+            self.main_window.document.save(formatted_docx)
+            
+            # 转换格式化后的文档为PDF
+            formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
+            self.convert_word_to_pdf(formatted_docx, formatted_pdf)
             
             # 显示格式化后的文档
-            self.show_formatted_document()
+            self.show_pdf_preview(formatted_pdf, self.formatted_layout)
             
         except Exception as e:
             self.main_window.show_message(f"更新预览失败: {str(e)}", error=True)
     
-    def show_original_document(self):
-        """显示原始文档"""
+    def show_pdf_preview(self, pdf_path, target_layout):
+        """显示PDF预览"""
         # 清除现有内容
-        self.clear_layout(self.original_layout)
+        for i in reversed(range(target_layout.count())): 
+            widget = target_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.setParent(None)
         
-        # 保存并转换原始文档
-        original_path = os.path.join(self.temp_dir, "original.docx")
-        self.main_window.document.doc.save(original_path)
-        self.convert_and_display(original_path, self.original_layout)
-    
-    def show_formatted_document(self):
-        """显示格式化后的文档"""
-        # 清除现有内容
-        self.clear_layout(self.formatted_layout)
+        # 使用PyMuPDF渲染PDF页面
+        doc = fitz.open(pdf_path)
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+            
+            # 将页面转换为QImage
+            img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+            pixmap = QPixmap.fromImage(img)
+            
+            # 创建页面容器
+            page_container = QFrame()
+            page_container.setStyleSheet("""
+                QFrame {
+                    background-color: white;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    margin: 10px;
+                }
+            """)
+            page_layout = QVBoxLayout(page_container)
+            page_layout.setContentsMargins(20, 20, 20, 20)
+            
+            # 创建标签显示页面
+            page_label = QLabel()
+            page_label.setPixmap(pixmap)
+            page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            page_layout.addWidget(page_label)
+            
+            # 添加页码
+            page_number = QLabel(f"第 {page_num + 1} 页")
+            page_number.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            page_number.setStyleSheet("color: #666; padding: 5px;")
+            page_layout.addWidget(page_number)
+            
+            target_layout.addWidget(page_container)
         
-        # 应用格式化并保存
-        formatted_path = os.path.join(self.temp_dir, "formatted.docx")
-        self.main_window.formatter.format()
-        self.main_window.document.save(formatted_path)
-        self.convert_and_display(formatted_path, self.formatted_layout)
+        doc.close()
     
-    def convert_and_display(self, docx_path, target_layout):
-        """转换并显示文档"""
+    def convert_word_to_pdf(self, docx_path, pdf_path):
+        """将Word文档转换为PDF"""
+        pythoncom.CoInitialize()
         try:
-            # 转换为PDF
-            pdf_path = docx_path.replace('.docx', '.pdf')
-            self.convert_word_to_pdf(docx_path, pdf_path)
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
             
-            # 显示页面
-            doc = fitz.open(pdf_path)
-            for page in doc:
-                pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-                img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                pixmap = QPixmap.fromImage(img)
-                
-                label = QLabel()
-                label.setPixmap(pixmap)
-                label.setStyleSheet("""
-                    QLabel {
-                        background-color: white;
-                        border: 1px solid #ddd;
-                        padding: 20px;
-                        border-radius: 5px;
-                        margin: 10px;
-                    }
-                """)
-                target_layout.addWidget(label)
+            doc = word.Documents.Open(docx_path)
+            doc.SaveAs(pdf_path, FileFormat=17)  # 17 represents PDF format
+            doc.Close()
+            word.Quit()
             
-            doc.close()
-            
-        except Exception as e:
-            raise Exception(f"转换文档失败: {str(e)}")
-    
-    def clear_layout(self, layout):
-        """清除布局中的所有部件"""
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        finally:
+            pythoncom.CoUninitialize()
     
     def save_document(self):
         """保存文档"""

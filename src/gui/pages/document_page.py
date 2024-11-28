@@ -4,67 +4,17 @@ from PyQt6.QtWidgets import (
     QFileDialog, QScrollArea, QLabel,
     QHBoxLayout, QFrame, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 from pathlib import Path
 import tempfile
 import os
 import win32com.client
 import pythoncom
-from PIL import Image
 import fitz  # PyMuPDF
 from src.core.document import Document
 from src.core.formatter import WordFormatter
 from src.config.config_manager import ConfigManager
-
-class PreviewWorker(QThread):
-    """异步预览加载工作线程"""
-    finished = pyqtSignal(list)  # 发送加载完成的页面列表
-    error = pyqtSignal(str)      # 发送错误信息
-    
-    def __init__(self, document, temp_dir):
-        super().__init__()
-        self.document = document
-        self.temp_dir = temp_dir
-    
-    def run(self):
-        """执行预览加载"""
-        try:
-            # 保存临时文件
-            temp_docx = os.path.join(self.temp_dir, "temp.docx")
-            self.document.doc.save(temp_docx)
-            
-            # 转换为PDF
-            pdf_path = os.path.join(self.temp_dir, "temp.pdf")
-            pythoncom.CoInitialize()  # 初始化COM
-            try:
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
-                
-                doc = word.Documents.Open(temp_docx)
-                doc.SaveAs(pdf_path, FileFormat=17)
-                doc.Close()
-                word.Quit()
-            finally:
-                pythoncom.CoUninitialize()
-            
-            # 加载PDF页面
-            pages = []
-            doc = fitz.open(pdf_path)
-            for page in doc:
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                pixmap = QPixmap.fromImage(img)
-                pages.append(pixmap)
-            
-            doc.close()
-            
-            # 发送完成信号
-            self.finished.emit(pages)
-            
-        except Exception as e:
-            # 发送错误信号
-            self.error.emit(str(e))
 
 class DocumentPage(QWidget):
     def __init__(self, main_window):
@@ -81,7 +31,12 @@ class DocumentPage(QWidget):
         
         # 顶部工具栏
         toolbar = QFrame()
-        toolbar.setStyleSheet("background-color: #f0f0f0;")
+        toolbar.setStyleSheet("""
+            QFrame {
+                background-color: #f0f0f0;
+                border-bottom: 1px solid #ddd;
+            }
+        """)
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(10, 5, 10, 5)
         
@@ -91,8 +46,9 @@ class DocumentPage(QWidget):
                 background-color: #0078d4;
                 color: white;
                 border: none;
-                padding: 5px 15px;
-                border-radius: 3px;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 14px;
             }
             QPushButton:hover {
                 background-color: #106ebe;
@@ -105,26 +61,40 @@ class DocumentPage(QWidget):
         layout.addWidget(toolbar)
         
         # 创建预览区域容器
-        self.preview_container = QWidget()
-        self.preview_container.setStyleSheet("""
+        preview_container = QWidget()
+        preview_container.setStyleSheet("""
             QWidget {
                 background-color: #f8f9fa;
             }
         """)
         
         # 创建预览区域布局
-        self.preview_layout = QVBoxLayout(self.preview_container)
+        self.preview_layout = QVBoxLayout(preview_container)
         self.preview_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.preview_layout.setSpacing(20)  # 设置页面之间的间距
         
         # 创建滚动区域
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidget(self.preview_container)
+        self.scroll_area.setWidget(preview_container)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
                 background-color: #f8f9fa;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #f0f0f0;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c1c1c1;
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #a8a8a8;
             }
         """)
         
@@ -134,8 +104,12 @@ class DocumentPage(QWidget):
         self.preview_label.setStyleSheet("""
             QLabel {
                 color: #666;
-                font-size: 14px;
-                padding: 20px;
+                font-size: 16px;
+                padding: 40px;
+                background-color: white;
+                border: 2px dashed #ddd;
+                border-radius: 8px;
+                margin: 20px;
             }
         """)
         self.preview_layout.addWidget(self.preview_label)
@@ -173,7 +147,7 @@ class DocumentPage(QWidget):
         """显示文档内容"""
         if not self.main_window.document:
             return
-        
+            
         try:
             # 清除现有内容
             self.preview_label.hide()
@@ -190,11 +164,14 @@ class DocumentPage(QWidget):
                     color: #666;
                     font-size: 14px;
                     padding: 20px;
+                    background-color: white;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
                 }
             """)
             self.preview_layout.addWidget(loading_label)
             
-            # 将文档保存为临时文件
+            # 保存临时文件
             temp_docx = os.path.join(self.temp_dir, "temp.docx")
             self.main_window.document.doc.save(temp_docx)
             
@@ -216,78 +193,45 @@ class DocumentPage(QWidget):
                 img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
                 pixmap = QPixmap.fromImage(img)
                 
+                # 创建页面容器
+                page_container = QFrame()
+                page_container.setStyleSheet("""
+                    QFrame {
+                        background-color: white;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        padding: 20px;
+                        margin: 10px 20px;
+                    }
+                """)
+                page_layout = QVBoxLayout(page_container)
+                page_layout.setContentsMargins(0, 0, 0, 0)
+                
                 # 创建标签显示页面
                 page_label = QLabel()
                 page_label.setPixmap(pixmap)
-                page_label.setStyleSheet("""
-                    QLabel {
-                        background-color: white;
-                        border: 1px solid #ddd;
-                        padding: 20px;
-                        border-radius: 5px;
-                        margin: 10px;
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                    }
-                """)
                 page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                
-                # 添加页面编号
-                page_container = QWidget()
-                page_layout = QVBoxLayout(page_container)
-                page_layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
                 page_layout.addWidget(page_label)
                 
+                # 添加页码
                 page_number = QLabel(f"第 {page_num + 1} 页")
                 page_number.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                page_number.setStyleSheet("color: #666; margin-top: 5px;")
+                page_number.setStyleSheet("""
+                    QLabel {
+                        color: #666;
+                        font-size: 12px;
+                        padding: 5px;
+                    }
+                """)
                 page_layout.addWidget(page_number)
                 
                 self.preview_layout.addWidget(page_container)
             
             doc.close()
             
-            # 添加一些间距到底部
-            spacer = QWidget()
-            spacer.setFixedHeight(20)
-            self.preview_layout.addWidget(spacer)
-            
         except Exception as e:
             self.main_window.show_message(f"预览失败: {str(e)}", error=True)
             self.preview_label.show()
-    
-    def on_preview_loaded(self, pages):
-        """预览加载完成的回调"""
-        try:
-            # 清除加载提示
-            for i in reversed(range(self.preview_layout.count())): 
-                widget = self.preview_layout.itemAt(i).widget()
-                if widget is not None:
-                    widget.setParent(None)
-            
-            # 显示预览页面
-            for pixmap in pages:
-                page_label = QLabel()
-                page_label.setPixmap(pixmap)
-                page_label.setStyleSheet("""
-                    QLabel {
-                        background-color: white;
-                        border: 1px solid #ddd;
-                        padding: 20px;
-                        border-radius: 5px;
-                        margin: 10px;
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                    }
-                """)
-                page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.preview_layout.addWidget(page_label)
-                
-        except Exception as e:
-            self.main_window.show_message(f"显示预览失败: {str(e)}", error=True)
-    
-    def on_preview_error(self, error_msg):
-        """预览加载错误的回调"""
-        self.main_window.show_message(f"加载预览失败: {error_msg}", error=True)
-        self.preview_label.show()
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
         """将Word文档转换为PDF"""
