@@ -26,38 +26,27 @@ class PreviewPage(QWidget):
         
         # 添加标题区域
         title_container = QFrame()
+        title_container.setFixedHeight(40)  # 固定标题高度
         title_container.setStyleSheet("""
             QFrame {
                 background-color: #f8f9fa;
                 border-bottom: 1px solid #dee2e6;
-                padding: 10px 0;
             }
         """)
         title_layout = QHBoxLayout(title_container)
-        title_layout.setContentsMargins(20, 10, 20, 10)
+        title_layout.setContentsMargins(20, 0, 20, 0)
         
         original_label = QLabel("原始文档")
         formatted_label = QLabel("格式化预览")
-        original_label.setStyleSheet("""
+        label_style = """
             QLabel {
-                font-size: 16px;
-                font-weight: bold;
                 color: #495057;
-                padding: 5px 15px;
-                background-color: #e9ecef;
-                border-radius: 4px;
-            }
-        """)
-        formatted_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
+                font-size: 13px;
                 font-weight: bold;
-                color: #495057;
-                padding: 5px 15px;
-                background-color: #e9ecef;
-                border-radius: 4px;
             }
-        """)
+        """
+        original_label.setStyleSheet(label_style)
+        formatted_label.setStyleSheet(label_style)
         title_layout.addWidget(original_label)
         title_layout.addStretch()
         title_layout.addWidget(formatted_label)
@@ -66,7 +55,10 @@ class PreviewPage(QWidget):
         
         # 创建分割视图
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setChildrenCollapsible(False)  # 防止完全折叠
+        splitter.setChildrenCollapsible(False)
+        
+        # 计算初始宽度
+        available_width = (self.window().width() - 40) // 2  # 减去边距后平分
         
         # 原始文档视图
         self.original_scroll = QScrollArea()
@@ -75,26 +67,7 @@ class PreviewPage(QWidget):
         self.original_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.original_scroll.setWidget(self.original_container)
         self.original_scroll.setWidgetResizable(True)
-        self.original_scroll.setStyleSheet("""
-            QScrollArea {
-                background-color: #ffffff;
-                border: none;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: #f0f0f0;
-                width: 10px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #c1c1c1;
-                min-height: 30px;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #a8a8a8;
-            }
-        """)
+        self.original_scroll.setMinimumWidth(available_width)
         
         # 格式化后的视图
         self.formatted_scroll = QScrollArea()
@@ -103,18 +76,35 @@ class PreviewPage(QWidget):
         self.formatted_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.formatted_scroll.setWidget(self.formatted_container)
         self.formatted_scroll.setWidgetResizable(True)
-        self.formatted_scroll.setStyleSheet(self.original_scroll.styleSheet())
+        self.formatted_scroll.setMinimumWidth(available_width)
         
-        # 设置滚动区域的最小宽度
-        min_width = (self.window().width() - 50) // 2  # 窗口宽度的一半减去一些边距
-        self.original_scroll.setMinimumWidth(min_width)
-        self.formatted_scroll.setMinimumWidth(min_width)
+        # 设置滚动区域样式
+        scroll_style = """
+            QScrollArea {
+                background-color: #ffffff;
+                border: none;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #f0f0f0;
+                width: 8px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c1c1c1;
+                min-height: 30px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #a8a8a8;
+            }
+        """
+        self.original_scroll.setStyleSheet(scroll_style)
+        self.formatted_scroll.setStyleSheet(scroll_style)
         
         splitter.addWidget(self.original_scroll)
         splitter.addWidget(self.formatted_scroll)
-        
-        # 设置分割比例
-        splitter.setSizes([min_width, min_width])
+        splitter.setSizes([available_width, available_width])
         
         layout.addWidget(splitter)
         
@@ -313,7 +303,7 @@ class PreviewPage(QWidget):
             doc.close()
             
         except Exception as e:
-            print(f"显示PDF预览失败: {str(e)}")
+            print(f"显���PDF预览失败: {str(e)}")
             raise
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
