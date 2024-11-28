@@ -47,6 +47,17 @@ class MainWindow(QMainWindow):
         # 初始状态只启用文档页面
         self.update_toolbar_state()
     
+    def show_message(self, message: str, error: bool = False):
+        """显示消息
+        Args:
+            message: 消息内容
+            error: 是否为错误消息
+        """
+        if error:
+            QMessageBox.critical(self, "错误", message)
+        else:
+            self.statusBar.showMessage(message, 5000)  # 显示5秒
+    
     def create_toolbar(self):
         """创建工具栏"""
         toolbar = QToolBar()
@@ -73,24 +84,24 @@ class MainWindow(QMainWindow):
     def show_document_page(self):
         """显示文档页面"""
         self.stacked_widget.setCurrentWidget(self.document_page)
-        self.statusBar.showMessage("第一步：请选择要格式化的Word文档")
+        self.show_message("第一步：请选择要格式化的Word文档")
     
     def show_format_page(self):
         """显示格式页面"""
         if not self.document:
-            QMessageBox.warning(self, "提示", "请先打开文档！")
+            self.show_message("请先打开文档！", error=True)
             return
         self.stacked_widget.setCurrentWidget(self.format_page)
-        self.statusBar.showMessage("第二步：选择或自定义格式设置")
+        self.show_message("第二步：选择或自定义格式设置")
     
     def show_preview_page(self):
         """显示预览页面"""
         if not self.document:
-            QMessageBox.warning(self, "提示", "请先打开文档！")
+            self.show_message("请先打开文档！", error=True)
             return
         self.stacked_widget.setCurrentWidget(self.preview_page)
         self.preview_page.update_preview()  # 更新预览内容
-        self.statusBar.showMessage("第三步：预览格式化结果并保存")
+        self.show_message("第三步：预览格式化结果并保存")
     
     def update_toolbar_state(self):
         """更新工具栏状态"""
@@ -104,10 +115,7 @@ class MainWindow(QMainWindow):
         
         # 更新动作的外观
         for action in self.toolbar_actions:
-            if action.isEnabled():
-                action.setText(action.text().replace('✓ ', ''))
-            else:
-                action.setText(action.text().replace('✓ ', ''))
+            action.setText(action.text().replace('✓ ', ''))
         
         # 为当前页面添加标记
         current_widget = self.stacked_widget.currentWidget()
@@ -116,4 +124,8 @@ class MainWindow(QMainWindow):
         elif current_widget == self.format_page:
             self.format_action.setText('✓ ' + self.format_action.text())
         elif current_widget == self.preview_page:
-            self.preview_action.setText('✓ ' + self.preview_action.text()) 
+            self.preview_action.setText('✓ ' + self.preview_action.text())
+        
+        # 强制更新按钮状态
+        self.format_action.setEnabled(has_document)
+        self.preview_action.setEnabled(has_document) 

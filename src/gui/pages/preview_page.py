@@ -1,16 +1,21 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QTextBrowser, QSplitter,
-    QLabel
+    QPushButton, QSplitter, QLabel,
+    QFileDialog
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument, QFont
-from docx.shared import Pt
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+import tempfile
+import os
+from pathlib import Path
+from docx2pdf import convert  # 用于转换docx到pdf
+import pythoncom  # 用于COM组件初始化
 
 class PreviewPage(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
+        self.temp_dir = tempfile.mkdtemp()  # 创建临时目录
         self.init_ui()
         
     def init_ui(self):
@@ -27,14 +32,10 @@ class PreviewPage(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # 原始文档视图
-        self.original_view = QTextBrowser()
-        self.original_view.setOpenExternalLinks(False)
-        self.original_view.setFont(QFont("Times New Roman", 12))
+        self.original_view = QWebEngineView()
         
         # 格式化后的视图
-        self.formatted_view = QTextBrowser()
-        self.formatted_view.setOpenExternalLinks(False)
-        self.formatted_view.setFont(QFont("Times New Roman", 12))
+        self.formatted_view = QWebEngineView()
         
         splitter.addWidget(self.original_view)
         splitter.addWidget(self.formatted_view)
@@ -55,62 +56,37 @@ class PreviewPage(QWidget):
         """更新预览内容"""
         if not self.main_window.document:
             return
-        
-        # 显示原始内容
-        original_html = self._convert_to_html(self.main_window.document.doc, formatted=False)
-        self.original_view.setHtml(original_html)
-        
-        # 显示格式化后的内容
-        formatted_html = self._convert_to_html(self.main_window.document.doc, formatted=True)
-        self.formatted_view.setHtml(formatted_html)
-    
-    def _convert_to_html(self, doc, formatted=False) -> str:
-        """将文档转换为HTML"""
-        html_content = ['<html><body>']
-        
-        for para in doc.paragraphs:
-            # 获取段落样式
-            style = para.style
-            style_attr = []
             
-            if formatted:
-                # 应用格式化后的样式
-                if style.name.startswith('Heading'):
-                    font_size = 14 if style.name == 'Heading 1' else 13
-                    style_attr.extend([
-                        f'font-size: {font_size}pt',
-                        'font-weight: bold',
-                        'margin-top: 12pt',
-                        'margin-bottom: 12pt'
-                    ])
-                else:
-                    # 正文样式
-                    style_attr.extend([
-                        'font-size: 12pt',
-                        'text-indent: 24pt',
-                        'line-height: 1.5',
-                        'text-align: justify'
-                    ])
-            else:
-                # 保持原始样式
-                if para.paragraph_format.first_line_indent:
-                    indent = para.paragraph_format.first_line_indent.pt
-                    style_attr.append(f'text-indent: {indent}pt')
-                if para.paragraph_format.line_spacing:
-                    style_attr.append(f'line-height: {para.paragraph_format.line_spacing}')
+        try:
+            # 初始化COM组件（用于Word转PDF）
+            pythoncom.CoInitialize()
             
-            # 创建样式字符串
-            style_str = f' style="{"; ".join(style_attr)}"' if style_attr else ''
+            # 保存原始文档到临时文件
+            original_docx = os.path.join(self.temp_dir, "original.docx")
+            self.main_window.document.doc.save(original_docx)
             
-            # 添加段落
-            if style.name.startswith('Heading'):
-                level = style.name[-1]
-                html_content.append(f'<h{level}{style_str}>{para.text}</h{level}>')
-            else:
-                html_content.append(f'<p{style_str}>{para.text}</p>')
-        
-        html_content.append('</body></html>')
-        return '\n'.join(html_content)
+            # 转换为PDF以便预览
+            original_pdf = os.path.join(self.temp_dir, "original.pdf")
+            convert(original_docx, original_pdf)
+            
+            # 显示原始文档
+            self.original_view.setUrl(QUrl.fromLocalFile(original_pdf))
+            
+            # 保存格式化后的文档到临时文件
+            formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
+            self.main_window.document.save(formatted_docx)
+            
+            # 转换为PDF以便预览
+            formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
+            convert(formatted_docx, formatted_pdf)
+            
+            # 显示格式化后的文档
+            self.formatted_view.setUrl(QUrl.fromLocalFile(formatted_pdf))
+            
+        except Exception as e:
+            self.main_window.show_message(f"预览更新失败: {str(e)}", error=True)
+        finally:
+            pythoncom.CoUninitialize()
     
     def save_document(self):
         """保存文档"""
@@ -129,4 +105,13 @@ class PreviewPage(QWidget):
                 self.main_window.document.save(file_path)
                 self.main_window.show_message(f"文档已保存至: {file_path}")
             except Exception as e:
-                self.main_window.show_message(f"保存失败: {str(e)}", error=True) 
+                self.main_window.show_message(f"保存失败: {str(e)}", error=True)
+    
+    def cleanup(self):
+        """清理临时文件"""
+        try:
+            for file in os.listdir(self.temp_dir):
+                os.remove(os.path.join(self.temp_dir, file))
+            os.rmdir(self.temp_dir)
+        except Exception as e:
+            print(f"清理临时文件失败: {str(e)}") 
