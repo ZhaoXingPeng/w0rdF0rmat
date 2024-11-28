@@ -24,18 +24,49 @@ class PreviewPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # 添加标题标签
-        title_layout = QHBoxLayout()
+        # 添加标题区域
+        title_container = QFrame()
+        title_container.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border-bottom: 1px solid #dee2e6;
+                padding: 10px 0;
+            }
+        """)
+        title_layout = QHBoxLayout(title_container)
+        title_layout.setContentsMargins(20, 10, 20, 10)
+        
         original_label = QLabel("原始文档")
         formatted_label = QLabel("格式化预览")
-        original_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 10px;")
-        formatted_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 10px;")
+        original_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: #495057;
+                padding: 5px 15px;
+                background-color: #e9ecef;
+                border-radius: 4px;
+            }
+        """)
+        formatted_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: #495057;
+                padding: 5px 15px;
+                background-color: #e9ecef;
+                border-radius: 4px;
+            }
+        """)
         title_layout.addWidget(original_label)
+        title_layout.addStretch()
         title_layout.addWidget(formatted_label)
-        layout.addLayout(title_layout)
+        
+        layout.addWidget(title_container)
         
         # 创建分割视图
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)  # 防止完全折叠
         
         # 原始文档视图
         self.original_scroll = QScrollArea()
@@ -46,8 +77,22 @@ class PreviewPage(QWidget):
         self.original_scroll.setWidgetResizable(True)
         self.original_scroll.setStyleSheet("""
             QScrollArea {
-                border: 1px solid #ddd;
-                background-color: #f8f9fa;
+                background-color: #ffffff;
+                border: none;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #f0f0f0;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c1c1c1;
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #a8a8a8;
             }
         """)
         
@@ -58,21 +103,33 @@ class PreviewPage(QWidget):
         self.formatted_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.formatted_scroll.setWidget(self.formatted_container)
         self.formatted_scroll.setWidgetResizable(True)
-        self.formatted_scroll.setStyleSheet("""
-            QScrollArea {
-                border: 1px solid #ddd;
-                background-color: #f8f9fa;
-            }
-        """)
+        self.formatted_scroll.setStyleSheet(self.original_scroll.styleSheet())
+        
+        # 设置滚动区域的最小宽度
+        min_width = (self.window().width() - 50) // 2  # 窗口宽度的一半减去一些边距
+        self.original_scroll.setMinimumWidth(min_width)
+        self.formatted_scroll.setMinimumWidth(min_width)
         
         splitter.addWidget(self.original_scroll)
         splitter.addWidget(self.formatted_scroll)
-        splitter.setSizes([600, 600])  # 设置初始宽度
+        
+        # 设置分割比例
+        splitter.setSizes([min_width, min_width])
         
         layout.addWidget(splitter)
         
         # 添加底部按钮
-        button_layout = QHBoxLayout()
+        button_container = QFrame()
+        button_container.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border-top: 1px solid #dee2e6;
+                padding: 10px;
+            }
+        """)
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(20, 10, 20, 10)
+        
         self.save_btn = QPushButton('保存文档')
         self.save_btn.setStyleSheet("""
             QPushButton {
@@ -82,15 +139,18 @@ class PreviewPage(QWidget):
                 padding: 8px 20px;
                 border-radius: 4px;
                 font-size: 14px;
+                min-width: 100px;
             }
             QPushButton:hover {
                 background-color: #106ebe;
             }
         """)
         self.save_btn.clicked.connect(self.save_document)
+        
         button_layout.addStretch()
         button_layout.addWidget(self.save_btn)
-        layout.addLayout(button_layout)
+        
+        layout.addWidget(button_container)
     
     def update_preview(self):
         """更新预览内容"""
@@ -194,8 +254,6 @@ class PreviewPage(QWidget):
     
     def show_pdf_preview(self, pdf_path, target_layout):
         """显示PDF预览"""
-        print(f"开始显示PDF预览: {pdf_path}")
-        
         try:
             # 清除现有内容
             for i in reversed(range(target_layout.count())): 
@@ -205,12 +263,15 @@ class PreviewPage(QWidget):
             
             # 使用PyMuPDF渲染PDF页面
             doc = fitz.open(pdf_path)
-            print(f"PDF页数: {len(doc)}")
             
+            # 计算适当的缩放比例
+            available_width = self.original_scroll.width() - 60  # 减去边距
             for page_num in range(len(doc)):
-                print(f"渲染第 {page_num + 1} 页")
                 page = doc[page_num]
-                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                # 计算缩放比例，使页面宽度适应视图
+                zoom = available_width / page.rect.width
+                # 使用计算出的缩放比例
+                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
                 
                 # 将页面转换为QImage
                 img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
@@ -221,7 +282,7 @@ class PreviewPage(QWidget):
                 page_container.setStyleSheet("""
                     QFrame {
                         background-color: white;
-                        border: 1px solid #ddd;
+                        border: 1px solid #dee2e6;
                         border-radius: 5px;
                         margin: 10px;
                     }
@@ -238,13 +299,18 @@ class PreviewPage(QWidget):
                 # 添加页码
                 page_number = QLabel(f"第 {page_num + 1} 页")
                 page_number.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                page_number.setStyleSheet("color: #666; padding: 5px;")
+                page_number.setStyleSheet("""
+                    QLabel {
+                        color: #6c757d;
+                        font-size: 12px;
+                        padding: 5px;
+                    }
+                """)
                 page_layout.addWidget(page_number)
                 
                 target_layout.addWidget(page_container)
             
             doc.close()
-            print("PDF预览显示完成")
             
         except Exception as e:
             print(f"显示PDF预览失败: {str(e)}")
