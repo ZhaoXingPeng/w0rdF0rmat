@@ -407,23 +407,45 @@ class PreviewPage(QWidget):
             pythoncom.CoUninitialize()
     
     def save_document(self):
-        """保存文档"""
+        """保存格式化后的文档"""
         if not self.main_window.document:
+            self.main_window.show_message("没有可保存的文档", error=True)
             return
-            
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "保存文档",
-            "",
-            "Word文档 (*.docx)"
-        )
         
-        if file_path:
-            try:
+        try:
+            # 获取保存路径
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "保存文档",
+                "",
+                "Word文档 (*.docx)"
+            )
+            
+            if not file_path:  # 用户取消了保存
+                return
+            
+            # 确保文件扩展名正确
+            if not file_path.lower().endswith('.docx'):
+                file_path += '.docx'
+            
+            # 获取格式化后的临时文档路径
+            formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
+            
+            if os.path.exists(formatted_docx):
+                # 复制格式化后的文档到目标位置
+                import shutil
+                shutil.copy2(formatted_docx, file_path)
+                
+                self.main_window.show_message(f"文档已保存至: {file_path}")
+            else:
+                # 如果找不到格式化后的文档，尝试保存原始文档
                 self.main_window.document.save(file_path)
                 self.main_window.show_message(f"文档已保存至: {file_path}")
-            except Exception as e:
-                self.main_window.show_message(f"保存失败: {str(e)}", error=True)
+                
+        except Exception as e:
+            error_msg = f"保存文档失败: {str(e)}"
+            print(error_msg)
+            self.main_window.show_message(error_msg, error=True)
     
     def cleanup(self):
         """清理临时文件"""
