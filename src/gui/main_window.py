@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
+from pathlib import Path
 from src.gui.pages.document_page import DocumentPage
 from src.gui.pages.format_page import FormatPage
 from src.gui.pages.preview_page import PreviewPage
@@ -20,12 +21,17 @@ class MainWindow(QMainWindow):
         self.document = None
         self.formatter = None
         
+        # 设置应用图标
+        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "app_icon.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+        
         # 初始化界面
         self.init_ui()
         
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle('Word文档格式化工具')
+        self.setWindowTitle('w0rdF0rmat')
         self.setMinimumSize(1200, 800)
         
         # 创建工具栏
