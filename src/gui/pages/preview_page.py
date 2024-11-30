@@ -20,6 +20,7 @@ class PreviewPage(QWidget):
         super().__init__()
         self.main_window = main_window
         self.temp_dir = tempfile.mkdtemp()
+        self.last_format_hash = None  # 添加格式哈希值记录
         self.init_ui()
         
     def init_ui(self):
@@ -169,7 +170,16 @@ class PreviewPage(QWidget):
         """更新预览内容"""
         if not self.main_window.document:
             return
+            
+        # 计算当前格式的哈希值
+        current_format_hash = self._calculate_format_hash()
         
+        # 如果格式没有变化且预览内容已存在，则不需要重新加载
+        if (current_format_hash == self.last_format_hash and 
+            self._preview_content_exists()):
+            print("格式未变化，跳过预览更新")
+            return
+            
         try:
             # 创建并显示加载指示器
             loading_left = LoadingIndicator(self)
@@ -217,7 +227,7 @@ class PreviewPage(QWidget):
             try:
                 # 移除左侧加载指示器
                 loading_left.stop()
-                loading_left.setParent(None)
+                loading_left.deleteLater()
                 
                 self.show_pdf_preview(original_pdf, self.original_layout)
                 print("原始文档预览显示成功")
@@ -270,13 +280,16 @@ class PreviewPage(QWidget):
             try:
                 # 移除右侧加载指示器
                 loading_right.stop()
-                loading_right.setParent(None)
+                loading_right.deleteLater()
                 
                 self.show_pdf_preview(formatted_pdf, self.formatted_layout)
                 print("格式化文档预览显示成功")
             except Exception as e:
                 print(f"显示格式化文档预览失败: {str(e)}")
                 raise
+            
+            # 更新格式哈希值
+            self.last_format_hash = current_format_hash
             
             print("=== 预览更新完成 ===\n")
             
@@ -288,10 +301,10 @@ class PreviewPage(QWidget):
             # 移除加载指示器
             if 'loading_left' in locals():
                 loading_left.stop()
-                loading_left.setParent(None)
+                loading_left.deleteLater()
             if 'loading_right' in locals():
                 loading_right.stop()
-                loading_right.setParent(None)
+                loading_right.deleteLater()
             
             # 显示错误提示
             self._show_error_preview("预览加载失败")
@@ -388,7 +401,7 @@ class PreviewPage(QWidget):
             doc.close()
             
         except Exception as e:
-            print(f"显示PDF预览失败: {str(e)}")
+            print(f"显示PDF预��失败: {str(e)}")
             raise
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
@@ -505,4 +518,43 @@ class PreviewPage(QWidget):
         layout.addStretch()
         
         error_dialog.exec()
+    
+    def _calculate_format_hash(self):
+        """计算当前格式的哈希值"""
+        if not self.main_window.formatter:
+            return None
+        import hashlib
+        import json
+        
+        def format_to_dict(obj):
+            """将格式对象转换为字典"""
+            if hasattr(obj, '__dict__'):
+                return {k: format_to_dict(v) for k, v in obj.__dict__.items()
+                       if not k.startswith('_')}
+            elif isinstance(obj, (list, tuple)):
+                return [format_to_dict(x) for x in obj]
+            elif isinstance(obj, dict):
+                return {k: format_to_dict(v) for k, v in obj.items()}
+            else:
+                return obj
+        
+        try:
+            # 将格式规范转换为字典
+            format_dict = format_to_dict(self.main_window.formatter.format_spec)
+            
+            # 转换为JSON字符串并排序键值
+            format_str = json.dumps(format_dict, sort_keys=True)
+            
+            # 计算哈希值
+            return hashlib.md5(format_str.encode()).hexdigest()
+            
+        except Exception as e:
+            print(f"计算格式哈希值失败: {str(e)}")
+            return None
+    
+    def _preview_content_exists(self):
+        """检查预览内容是否已存在"""
+        original_pdf = os.path.join(self.temp_dir, "original.pdf")
+        formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
+        return os.path.exists(original_pdf) and os.path.exists(formatted_pdf)
     
