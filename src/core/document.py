@@ -237,3 +237,75 @@ class Document:
         if content:
             return self.ai_assistant.suggest_formatting(section_type, content)
         return None
+
+    def add_section_breaks(self):
+        """
+        为每个主要章节添加分节符
+        """
+        try:
+            # 获取所有段落
+            paragraphs = self.doc.paragraphs
+            
+            # 遍历段落，为每个一级标题前添加分节符
+            for i, para in enumerate(paragraphs):
+                if self._is_main_section_heading(para.text):
+                    # 在当前段落前添加分节符
+                    run = para._p.get_or_add_pPr()
+                    sectPr = run.get_or_add_sectPr()
+                    # 设置分节类型为下一页
+                    sectPr.set('type', 'nextPage')
+                    print(f"已在章节 '{para.text}' 前添加分节符")
+        
+        except Exception as e:
+            print(f"添加分节符时出错: {str(e)}")
+
+    def _is_main_section_heading(self, text: str) -> bool:
+        """
+        判断是否为一级章节标题
+        """
+        text = text.strip()
+        
+        # 检查数字编号格式（如 "1. 引言"）
+        if any(text.startswith(f"{i}. ") for i in range(1, 10)):
+            return True
+        
+        # 检查中文数字编号格式（如 "一、引言"）
+        chinese_numbers = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
+        if any(text.startswith(f"{num}、") for num in chinese_numbers):
+            return True
+        
+        # 检查特定的一级标题关键词
+        main_section_keywords = [
+            '引言', '介绍',
+            '研究背景', '理论基础',
+            '研究方法', '实验方法',
+            '结果分析', '实验结果',
+            '讨论', '结论',
+            '参考文献'
+        ]
+        
+        return any(text.startswith(keyword) for keyword in main_section_keywords)
+
+    def format_sections(self):
+        """
+        格式化章节，包括添加分节符和应用格式
+        """
+        # 先添加分节符
+        self.add_section_breaks()
+        
+        # 然后应用格式
+        sections = self.get_all_sections()
+        for section_name, paragraphs in sections.items():
+            # 格式化章节标题
+            if section_name in self.sections:
+                section_para = next((p for p in self.doc.paragraphs 
+                                 if p.text.strip() == section_name), None)
+                if section_para:
+                    if self._is_main_section_heading(section_name):
+                        self._apply_section_format(section_para, self.format_spec.heading1)
+                    else:
+                        self._apply_section_format(section_para, self.format_spec.heading2)
+            
+            # 格式化章节内容
+            for para in paragraphs:
+                self._apply_section_format(para, self.format_spec.body)

@@ -80,23 +80,4 @@ class LoadingIndicator(QFrame):
             painter.drawLine(0, -radius + 10, 0, -radius + 20)
     
     def sizeHint(self):
-        return QSize(120, 120)
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # 设置画笔
-        pen = QPen(QColor("#0078d4"))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        
-        # 绘制圆弧
-        center = self.rect().center()
-        painter.translate(center)
-        painter.rotate(self.angle)
-        
-        for i in range(8):
-            painter.rotate(45)
-            painter.setOpacity(0.125 * (i + 1))
-            painter.drawLine(0, 10, 0, 15) 
+        return QSize(120, 120) 

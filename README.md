@@ -1,41 +1,16 @@
-# Word Document Formatting Tool  
 # Word文档格式化工具
 
-A Python-based automation tool designed to streamline formatting academic papers, with intelligent document structure recognition and customizable formatting options.  
 一个用于自动化处理学术论文格式的Python工具，支持智能识别文档结构并应用指定格式要求。
 
----
-
-## Features  
 ## 功能特点
 
-- 🔍 **Intelligent Document Structure Recognition**  
-  Identifies titles, abstracts, keywords, sections, and more.  
-  **智能识别文档结构**（标题、摘要、关键词、章节等）
+- 🔍 智能识别文档结构（标题、摘要、关键词、章节等）
+- 📝 支持多种格式识别方式（样式解析、传统解析、AI辅助）
+- 🎨 灵活的格式规范配置
+- 🤖 可选的AI辅助分析和格式建议
+- 📋 预设格式模板支持
+- 🔧 自定义格式要求
 
-- 📝 **Supports Multiple Parsing Methods**  
-  Includes style parsing, traditional parsing, and optional AI assistance.  
-  **支持多种解析方式**（样式解析、传统解析、AI辅助）
-
-- 🎨 **Flexible Formatting Configuration**  
-  Define your own formatting rules with ease.  
-  **灵活的格式规范配置**
-
-- 🤖 **AI-Assisted Analysis (Optional)**  
-  Provides formatting suggestions using AI (e.g., GPT-3.5-Turbo).  
-  **可选的AI辅助分析**，提供智能格式建议（如GPT-3.5-Turbo）
-
-- 📋 **Preset Formatting Templates**  
-  Includes default templates for common styles.  
-  **预设格式模板支持**
-
-- 🔧 **Customizable Format Requirements**  
-  Adjust settings to fit specific style guidelines.  
-  **支持自定义格式要求**
-
----
-
-## Project Structure  
 ## 项目结构
 
 ```

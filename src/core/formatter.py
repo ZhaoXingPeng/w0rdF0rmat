@@ -76,7 +76,7 @@ class WordFormatter:
     
     def _apply_section_format(self, paragraph, section_format):
         """
-        应用段落格式
+        应用段落式
         """
         if not paragraph:
             return
@@ -581,8 +581,8 @@ class WordFormatter:
             tcBorders.append(border)
             
         except Exception as e:
-            print(f"设置边框失败: {str(e)}")
-            # 尝试使用备用方法
+            print(f"设置边框失��: {str(e)}")
+            # 尝试使用备方法
             try:
                 tc = cell._tc
                 tcPr = tc.get_or_add_tcPr()
@@ -778,7 +778,7 @@ class WordFormatter:
 
     def _format_toc_title(self, paragraph):
         """格式化目录标题"""
-        # 清除现有格式
+        # 清除现���格式
         paragraph.clear()
         
         # 添加标题文本

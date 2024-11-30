@@ -2,7 +2,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, 
     QFileDialog, QScrollArea, QLabel,
-    QHBoxLayout, QFrame, QSplitter
+    QHBoxLayout, QFrame, QSplitter,
+    QDialog, QApplication, QVBoxLayout
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
@@ -476,9 +477,10 @@ class PreviewPage(QWidget):
             }
         """)
         
-        error_dialog.setLayout(QVBoxLayout())
-        error_dialog.layout().addWidget(error_label)
-        error_dialog.layout().addStretch()
+        layout = QVBoxLayout()
+        error_dialog.setLayout(layout)
+        layout.addWidget(error_label)
+        layout.addStretch()
         
         error_dialog.exec()
     

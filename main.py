@@ -8,7 +8,7 @@ def main():
         config_manager = ConfigManager()
         
         # 读取测试文档
-        doc = Document("./src/test/test.docx")
+        doc = Document("./test/test.docx")
         
         # 创建格式化器并使用默认格式
         formatter = WordFormatter(doc, config_manager)
@@ -17,7 +17,7 @@ def main():
         formatter.format()
         
         # 保存格式化后的文档
-        doc.save("./src/test/output.docx")
+        doc.save("./test/output.docx")
         print("文档格式化完成，已保存为 output.docx")
         
     except FileNotFoundError:

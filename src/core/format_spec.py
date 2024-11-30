@@ -254,7 +254,7 @@ class FormatSpecParser:
         """
         解析用户提供的格式要求
         Args:
-            requirements: 用户提供的格式要求文本
+            requirements: 户提供的格式要求文本
             config_manager: 配置管理器实例
         Returns:
             解析后的DocumentFormat对象
