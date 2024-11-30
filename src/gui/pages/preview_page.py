@@ -14,13 +14,14 @@ import win32com.client
 import pythoncom
 import fitz  # PyMuPDF
 from src.gui.components.loading_indicator import LoadingIndicator
+from src.utils.temp_manager import TempManager  # 添加导入
 
 class PreviewPage(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.temp_dir = tempfile.mkdtemp()
-        self.last_format_hash = None  # 添加格式哈希值记录
+        self.temp_manager = TempManager()  # 使用临时文件管理器
+        self.last_format_hash = None
         self.init_ui()
         
     def init_ui(self):
@@ -201,10 +202,9 @@ class PreviewPage(QWidget):
             QApplication.processEvents()
             
             # 保存原始文档
-            original_docx = os.path.join(self.temp_dir, "original.docx")
+            original_docx = self.temp_manager.get_temp_path("original.docx")
             print(f"保存原始文档到: {original_docx}")
             try:
-                # 创建原始文档的副本
                 import shutil
                 shutil.copy2(self.main_window.document.path, original_docx)
                 print("原始文档保存成功")
@@ -213,7 +213,7 @@ class PreviewPage(QWidget):
                 raise
             
             # 转换原始文档为PDF
-            original_pdf = os.path.join(self.temp_dir, "original.pdf")
+            original_pdf = self.temp_manager.get_temp_path("original.pdf")
             print(f"转换原始文档为PDF: {original_pdf}")
             try:
                 self.convert_word_to_pdf(original_docx, original_pdf)
@@ -236,10 +236,11 @@ class PreviewPage(QWidget):
                 raise
             
             # 创建并格式化新文档
-            formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
+            formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             print(f"创建格式化文档: {formatted_docx}")
             try:
                 # 复制原始文档
+                import shutil
                 shutil.copy2(original_docx, formatted_docx)
                 print("文档副本创建成功")
                 
@@ -266,7 +267,7 @@ class PreviewPage(QWidget):
                 raise
             
             # 转换格式化后的文档为PDF
-            formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
+            formatted_pdf = self.temp_manager.get_temp_path("formatted.pdf")
             print(f"转换格式化文档为PDF: {formatted_pdf}")
             try:
                 self.convert_word_to_pdf(formatted_docx, formatted_pdf)
@@ -401,7 +402,7 @@ class PreviewPage(QWidget):
             doc.close()
             
         except Exception as e:
-            print(f"显示PDF预��失败: {str(e)}")
+            print(f"显示PDF预览失败: {str(e)}")
             raise
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
@@ -442,7 +443,7 @@ class PreviewPage(QWidget):
                 file_path += '.docx'
             
             # 获取格式化后的临时文档路径
-            formatted_docx = os.path.join(self.temp_dir, "formatted.docx")
+            formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             
             if os.path.exists(formatted_docx):
                 # 复制格式化后的文档到目标位置
@@ -554,7 +555,7 @@ class PreviewPage(QWidget):
     
     def _preview_content_exists(self):
         """检查预览内容是否已存在"""
-        original_pdf = os.path.join(self.temp_dir, "original.pdf")
-        formatted_pdf = os.path.join(self.temp_dir, "formatted.pdf")
+        original_pdf = self.temp_manager.get_temp_path("original.pdf")
+        formatted_pdf = self.temp_manager.get_temp_path("formatted.pdf")
         return os.path.exists(original_pdf) and os.path.exists(formatted_pdf)
     
