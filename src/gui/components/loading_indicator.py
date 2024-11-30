@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QFrame
 from PyQt6.QtCore import Qt, QTimer, QSize
-from PyQt6.QtGui import QPainter, QColor, QPen, QPainterPath
+from PyQt6.QtGui import QPainter, QColor, QPen
 
 class LoadingIndicator(QFrame):
     def __init__(self, parent=None):
@@ -50,15 +50,16 @@ class LoadingIndicator(QFrame):
     def rotate(self):
         """旋转动画"""
         self.angle = (self.angle + 10) % 360
-        self.update()
+        self.update()  # 触发重绘
     
     def paintEvent(self, event):
         """绘制加载动画"""
         super().paintEvent(event)
+        
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # 绘制背景
+        # 绘制半透明背景
         painter.fillRect(self.rect(), QColor(0, 0, 0, 180))
         
         # 设置画笔
@@ -70,14 +71,22 @@ class LoadingIndicator(QFrame):
         center = self.rect().center()
         radius = min(center.x(), center.y()) - 20
         
-        # 绘制加载动画
-        painter.translate(center)
-        painter.rotate(self.angle)
+        # 保存当前状态
+        painter.save()
         
+        # 移动到中心点并旋转
+        painter.translate(center)
+        painter.rotate(float(self.angle))  # 确保角度是浮点数
+        
+        # 绘制8个点，每个点的不透明度不同
         for i in range(8):
-            painter.rotate(45)
-            painter.setOpacity(0.125 * (i + 1))
+            painter.rotate(45)  # 每个点旋转45度
+            opacity = 0.125 * (i + 1)  # 不透明度从0.125到1.0
+            painter.setOpacity(opacity)
             painter.drawLine(0, -radius + 10, 0, -radius + 20)
+        
+        # 恢复状态
+        painter.restore()
     
     def sizeHint(self):
         return QSize(120, 120) 

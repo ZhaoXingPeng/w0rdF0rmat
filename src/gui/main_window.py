@@ -78,27 +78,33 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.preview_page)
         
         # 文档管理动作
-        self.doc_action = QAction('1. 打开文档', self)
-        self.doc_action.triggered.connect(self.show_document_page)
-        self.doc_action.setProperty("selected", True)
-        toolbar.addAction(self.doc_action)
+        doc_button = QToolButton()
+        doc_button.setText('1. 打开文档')
+        doc_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        doc_button.clicked.connect(self.show_document_page)
+        doc_button.setProperty("selected", True)
+        toolbar.addWidget(doc_button)
         
         # 格式设置动作
-        self.format_action = QAction('2. 设置格式', self)
-        self.format_action.triggered.connect(self.show_format_page)
-        self.format_action.setEnabled(False)
-        self.format_action.setProperty("selected", False)
-        toolbar.addAction(self.format_action)
+        format_button = QToolButton()
+        format_button.setText('2. 设置格式')
+        format_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        format_button.clicked.connect(self.show_format_page)
+        format_button.setEnabled(False)
+        format_button.setProperty("selected", False)
+        toolbar.addWidget(format_button)
         
         # 预览动作
-        self.preview_action = QAction('3. 预览结果', self)
-        self.preview_action.triggered.connect(self.show_preview_page)
-        self.preview_action.setEnabled(False)
-        self.preview_action.setProperty("selected", False)
-        toolbar.addAction(self.preview_action)
+        preview_button = QToolButton()
+        preview_button.setText('3. 预览结果')
+        preview_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        preview_button.clicked.connect(self.show_preview_page)
+        preview_button.setEnabled(False)
+        preview_button.setProperty("selected", False)
+        toolbar.addWidget(preview_button)
         
-        # 保存这些动作的引用
-        self.toolbar_actions = [self.doc_action, self.format_action, self.preview_action]
+        # 保存这些按钮的引用
+        self.toolbar_buttons = [doc_button, format_button, preview_button]
         
         # 初始状态只启用文档页面
         self.update_toolbar_state()
@@ -115,26 +121,31 @@ class MainWindow(QMainWindow):
         try:
             # 更新按钮状态
             has_document = bool(self.document)
-            self.format_action.setEnabled(has_document)
-            self.preview_action.setEnabled(has_document)
+            self.toolbar_buttons[1].setEnabled(has_document)  # 格式按钮
+            self.toolbar_buttons[2].setEnabled(has_document)  # 预览按钮
             
             # 更新选中状态
             current_widget = self.stacked_widget.currentWidget()
             
             # 重置所有按钮状态
-            for action in self.toolbar_actions:
-                action.setProperty("selected", False)
+            for button in self.toolbar_buttons:
+                button.setProperty("selected", False)
+                button.style().unpolish(button)  # 强制更新样式
+                button.style().polish(button)
             
             # 设置当前页面对应的按钮状态
             if current_widget == self.document_page:
-                self.doc_action.setProperty("selected", True)
+                self.toolbar_buttons[0].setProperty("selected", True)
             elif current_widget == self.format_page:
-                self.format_action.setProperty("selected", True)
+                self.toolbar_buttons[1].setProperty("selected", True)
             elif current_widget == self.preview_page:
-                self.preview_action.setProperty("selected", True)
+                self.toolbar_buttons[2].setProperty("selected", True)
             
-            # 强制更新样式
-            super().style().polish(self)
+            # 强制更新选中按钮的样式
+            for button in self.toolbar_buttons:
+                if button.property("selected"):
+                    button.style().unpolish(button)
+                    button.style().polish(button)
             
         except Exception as e:
             print(f"更新工具栏状态失败: {str(e)}")
