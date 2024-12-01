@@ -18,11 +18,17 @@ class WordFormatter:
         try:
             doc = self.document.doc
             print("开始应用格式...")
-
+            
+            in_references = False  # 标记是否在参考文献部分
+            
             # 遍历所有段落
             for paragraph in doc.paragraphs:
-                # 根据段落内容或样式应用不同的格式
-                if "摘要" in paragraph.text:
+                if "参考文献" in paragraph.text:
+                    in_references = True
+                    self._apply_references_format(paragraph)
+                elif in_references:
+                    self._apply_references_format(paragraph)
+                elif "摘要" in paragraph.text:
                     self._apply_abstract_format(paragraph)
                 elif paragraph.style.name.startswith('Heading'):
                     self._apply_heading_format(paragraph)
@@ -145,4 +151,48 @@ class WordFormatter:
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), spec['font'])
             if 'size' in spec:
                 run.font.size = Pt(spec['size'])
+    
+    def _apply_references_format(self, paragraph):
+        """应用参考文献格式"""
+        spec = self.format_spec.get('references', {})
+        title_spec = spec.get('title', {})
+        items_spec = spec.get('items', {})
+        
+        if "参考文献" in paragraph.text:
+            # 应用标题格式
+            self._apply_font_format(paragraph, title_spec)
+            # 应用对齐方式
+            align_map = {
+                "居中": WD_PARAGRAPH_ALIGNMENT.CENTER,
+                "左对齐": WD_PARAGRAPH_ALIGNMENT.LEFT,
+                "右对齐": WD_PARAGRAPH_ALIGNMENT.RIGHT
+            }
+            if 'align' in title_spec:
+                paragraph.alignment = align_map.get(title_spec['align'], WD_PARAGRAPH_ALIGNMENT.CENTER)
+            # 应用段后间距
+            if 'spacing' in title_spec:
+                paragraph.paragraph_format.space_after = Pt(title_spec['spacing'])
+        else:
+            # 应用条目格式
+            self._apply_font_format(paragraph, items_spec)
+            # 应用行间距
+            if 'line_spacing' in items_spec:
+                paragraph.paragraph_format.line_spacing = items_spec['line_spacing']
+            # 应用条目间距
+            if 'para_spacing' in items_spec:
+                paragraph.paragraph_format.space_after = Pt(items_spec['para_spacing'])
+            # 应用悬挂缩进
+            if 'hanging_indent' in items_spec:
+                # 设置首行缩进为负值，左缩进为正值，实现悬挂缩进
+                char_width = Pt(items_spec.get('size', 12))  # 使用字号计算字符宽度
+                indent = items_spec['hanging_indent'] * char_width
+                paragraph.paragraph_format.first_line_indent = -indent
+                paragraph.paragraph_format.left_indent = indent
+            # 应用对齐方式
+            align_map = {
+                "两端对齐": WD_PARAGRAPH_ALIGNMENT.JUSTIFY,
+                "左对齐": WD_PARAGRAPH_ALIGNMENT.LEFT
+            }
+            if 'align' in items_spec:
+                paragraph.alignment = align_map.get(items_spec['align'], WD_PARAGRAPH_ALIGNMENT.JUSTIFY)
     

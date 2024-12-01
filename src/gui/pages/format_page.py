@@ -247,7 +247,7 @@ class FormatPage(QWidget):
         chapter_group.setLayout(chapter_layout)
         layout.addWidget(chapter_group)
         
-        # 正文格式
+        # 正��格式
         body_group = QGroupBox("正文格式")
         body_layout = QFormLayout()
         
@@ -331,6 +331,15 @@ class FormatPage(QWidget):
         self.contents_title_size.setValue(16)
         title_layout.addRow("字号:", self.contents_title_size)
         
+        self.contents_title_align = QComboBox()
+        self.contents_title_align.addItems(["居中", "左对齐", "右对齐"])
+        title_layout.addRow("对齐方式:", self.contents_title_align)
+        
+        self.contents_title_spacing = QSpinBox()
+        self.contents_title_spacing.setRange(0, 50)
+        self.contents_title_spacing.setValue(24)
+        title_layout.addRow("段后间距:", self.contents_title_spacing)
+        
         title_group.setLayout(title_layout)
         layout.addWidget(title_group)
         
@@ -353,8 +362,33 @@ class FormatPage(QWidget):
         self.contents_line_spacing.setSingleStep(0.05)
         items_layout.addRow("行间距:", self.contents_line_spacing)
         
+        self.contents_level_indent = QSpinBox()
+        self.contents_level_indent.setRange(0, 4)
+        self.contents_level_indent.setValue(2)
+        items_layout.addRow("层级缩进(字符):", self.contents_level_indent)
+        
+        self.contents_align = QComboBox()
+        self.contents_align.addItems(["左对齐", "两端对齐"])
+        items_layout.addRow("对齐方式:", self.contents_align)
+        
         items_group.setLayout(items_layout)
         layout.addWidget(items_group)
+        
+        # 页码格式
+        page_num_group = QGroupBox("页码格式")
+        page_num_layout = QFormLayout()
+        
+        self.page_num_font = QComboBox()
+        self.page_num_font.addItems(["Times New Roman", "宋体", "Arial"])
+        page_num_layout.addRow("字体:", self.page_num_font)
+        
+        self.page_num_size = QSpinBox()
+        self.page_num_size.setRange(8, 14)
+        self.page_num_size.setValue(10)
+        page_num_layout.addRow("字号:", self.page_num_size)
+        
+        page_num_group.setLayout(page_num_layout)
+        layout.addWidget(page_num_group)
         
         layout.addStretch()
         return tab
@@ -377,6 +411,15 @@ class FormatPage(QWidget):
         self.ref_title_size.setValue(16)
         title_layout.addRow("字号:", self.ref_title_size)
         
+        self.ref_title_align = QComboBox()
+        self.ref_title_align.addItems(["居中", "左对齐", "右对齐"])
+        title_layout.addRow("对齐方式:", self.ref_title_align)
+        
+        self.ref_title_spacing = QSpinBox()
+        self.ref_title_spacing.setRange(0, 50)
+        self.ref_title_spacing.setValue(24)
+        title_layout.addRow("段后间距:", self.ref_title_spacing)
+        
         title_group.setLayout(title_layout)
         layout.addWidget(title_group)
         
@@ -398,6 +441,20 @@ class FormatPage(QWidget):
         self.ref_line_spacing.setValue(1.15)
         self.ref_line_spacing.setSingleStep(0.05)
         items_layout.addRow("行间距:", self.ref_line_spacing)
+        
+        self.ref_para_spacing = QSpinBox()
+        self.ref_para_spacing.setRange(0, 20)
+        self.ref_para_spacing.setValue(6)
+        items_layout.addRow("条目间距:", self.ref_para_spacing)
+        
+        self.ref_hanging_indent = QSpinBox()
+        self.ref_hanging_indent.setRange(0, 4)
+        self.ref_hanging_indent.setValue(2)
+        items_layout.addRow("悬挂缩进(字符):", self.ref_hanging_indent)
+        
+        self.ref_align = QComboBox()
+        self.ref_align.addItems(["两端对齐", "左对齐"])
+        items_layout.addRow("对齐方式:", self.ref_align)
         
         items_group.setLayout(items_layout)
         layout.addWidget(items_group)
@@ -443,12 +500,16 @@ class FormatPage(QWidget):
                 'contents': {
                     'title': {
                         'font': self.contents_title_font.currentText(),
-                        'size': self.contents_title_size.value()
+                        'size': self.contents_title_size.value(),
+                        'align': self.contents_title_align.currentText(),
+                        'spacing': self.contents_title_spacing.value()
                     },
                     'items': {
                         'font': self.contents_font.currentText(),
                         'size': self.contents_size.value(),
-                        'line_spacing': self.contents_line_spacing.value()
+                        'line_spacing': self.contents_line_spacing.value(),
+                        'level_indent': self.contents_level_indent.value(),
+                        'align': self.contents_align.currentText()
                     }
                 },
                 'main_text': {
@@ -476,12 +537,17 @@ class FormatPage(QWidget):
                 'references': {
                     'title': {
                         'font': self.ref_title_font.currentText(),
-                        'size': self.ref_title_size.value()
+                        'size': self.ref_title_size.value(),
+                        'align': self.ref_title_align.currentText(),
+                        'spacing': self.ref_title_spacing.value()
                     },
                     'items': {
                         'font': self.ref_font.currentText(),
                         'size': self.ref_size.value(),
-                        'line_spacing': self.ref_line_spacing.value()
+                        'line_spacing': self.ref_line_spacing.value(),
+                        'para_spacing': self.ref_para_spacing.value(),
+                        'hanging_indent': self.ref_hanging_indent.value(),
+                        'align': self.ref_align.currentText()
                     }
                 }
             }
