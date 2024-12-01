@@ -370,33 +370,13 @@ class FormatPage(QWidget):
             # 设置格式已配置状态
             self.main_window.set_format_configured(True)
             
-            # 显示无声消息框
-            msg = QMessageBox(self)
-            msg.setWindowTitle("成功")
-            msg.setText("格式设置已应用！\n您现在可以预览文档了。")
-            msg.setIcon(QMessageBox.Icon.Information)
-            # 设置为无声模式
-            msg.setWindowFlags(
-                msg.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint |
-                Qt.WindowType.MSWindowsFixedSizeDialogHint |
-                Qt.WindowType.CustomizeWindowHint
-            )
-            msg.exec()
+            # 直接跳转到预览页面
+            self.main_window.show_preview_page()
             
         except Exception as e:
-            # 显示无声错误消息框
-            msg = QMessageBox(self)
-            msg.setWindowTitle("错误")
-            msg.setText(f"应用格式失败：{str(e)}")
-            msg.setIcon(QMessageBox.Icon.Critical)
-            # 设置为无声模式
-            msg.setWindowFlags(
-                msg.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint |
-                Qt.WindowType.MSWindowsFixedSizeDialogHint |
-                Qt.WindowType.CustomizeWindowHint
-            )
-            msg.exec()
-            
+            error_msg = f"应用格式失败：{str(e)}"
+            print(error_msg)  # 保留调试信息
+            self.main_window.show_message(error_msg, error=True)
             import traceback
             traceback.print_exc()
     
