@@ -122,7 +122,40 @@ class MainWindow(QMainWindow):
     def show_message(self, message: str, error: bool = False):
         """显示消息"""
         if error:
-            QMessageBox.critical(self, "错误", message)
+            msg = QMessageBox(self)
+            msg.setWindowTitle("错误")
+            msg.setText(message)
+            msg.setIcon(QMessageBox.Icon.Critical)
+            # 设置无声模式和样式
+            msg.setWindowFlags(
+                Qt.WindowType.Dialog |
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint
+            )
+            msg.setStyleSheet("""
+                QMessageBox {
+                    background-color: #2c2c2c;
+                    color: #ffffff;
+                }
+                QLabel {
+                    color: #ffffff;
+                    font-size: 14px;
+                    padding: 10px;
+                }
+                QPushButton {
+                    background-color: #0078d4;
+                    color: white;
+                    border: none;
+                    padding: 8px 20px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #106ebe;
+                }
+            """)
+            msg.exec()
         else:
             self.statusBar.showMessage(message, 5000)  # 显示5秒
     

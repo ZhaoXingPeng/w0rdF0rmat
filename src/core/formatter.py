@@ -1,87 +1,77 @@
 from docx.shared import Pt, Inches, Cm
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_ALIGN_PARAGRAPH
-from docx.table import _Cell, _Row, _Column
-from docx.shared import RGBColor
-from docx.oxml import OxmlElement, parse_xml
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
-from docx.enum.section import WD_SECTION, WD_ORIENT
-
-# 导入格式相关的类
-from .format_spec import (
-    DocumentFormat,
-    SectionFormat,
-    TableFormat,
-    TableCellFormat,
-    ImageFormat,
-    CaptionFormat,
-    FormatSpecParser
-)
-
-# 定义制表符相关的常量
-class WD_TAB_ALIGNMENT:
-    LEFT = 0
-    CENTER = 1
-    RIGHT = 2
-
-class WD_TAB_LEADER:
-    SPACES = 0
-    DOTS = 1
-    DASHES = 2
-    LINES = 3
-    HEAVY = 4
-    MIDDLE_DOT = 5
 
 class WordFormatter:
     def __init__(self, document, config_manager):
         self.document = document
         self.config_manager = config_manager
-        self.format_spec = {}  # 初始化格式规范
-    
+        self.format_spec = {}
+
     def set_format_spec(self, format_spec):
         """设置格式规范"""
         self.format_spec = format_spec
-    
+        print("格式规范已更新:", format_spec)
+
     def format(self):
         """应用格式到文档"""
         try:
             doc = self.document.doc
-            
-            # 应用段落格式
-            if 'paragraph' in self.format_spec:
-                para_spec = self.format_spec['paragraph']
-                for paragraph in doc.paragraphs:
-                    # 设置段落间距
-                    if 'before_spacing' in para_spec:
-                        paragraph.paragraph_format.space_before = Pt(para_spec['before_spacing'])
-                    if 'after_spacing' in para_spec:
-                        paragraph.paragraph_format.space_after = Pt(para_spec['after_spacing'])
-                    if 'line_spacing' in para_spec:
-                        paragraph.paragraph_format.line_spacing = para_spec['line_spacing']
-                    
-                    # 设置对齐方式
-                    if 'alignment' in para_spec:
-                        alignment_map = {
-                            "左对齐": WD_PARAGRAPH_ALIGNMENT.LEFT,
-                            "居中": WD_PARAGRAPH_ALIGNMENT.CENTER,
-                            "右对齐": WD_PARAGRAPH_ALIGNMENT.RIGHT,
-                            "两端对齐": WD_PARAGRAPH_ALIGNMENT.JUSTIFY
-                        }
-                        paragraph.alignment = alignment_map.get(para_spec['alignment'], WD_PARAGRAPH_ALIGNMENT.LEFT)
-            
-            # 应用字体格式
-            if 'font' in self.format_spec:
-                font_spec = self.format_spec['font']
-                for paragraph in doc.paragraphs:
-                    for run in paragraph.runs:
-                        if 'name' in font_spec:
-                            run.font.name = font_spec['name']
-                            run._element.rPr.rFonts.set(qn('w:eastAsia'), font_spec['name'])
-                        if 'size' in font_spec:
-                            run.font.size = Pt(font_spec['size'])
-            
+            print("开始应用格式...")
+
+            # 遍历所有段落
+            for paragraph in doc.paragraphs:
+                # 根据段落内容或样式应用不同的格式
+                if "摘要" in paragraph.text:
+                    self._apply_abstract_format(paragraph)
+                elif paragraph.style.name.startswith('Heading'):
+                    self._apply_heading_format(paragraph)
+                else:
+                    self._apply_body_format(paragraph)
+
+            print("格式应用完成")
+            return True
+
         except Exception as e:
             print(f"格式化失败: {str(e)}")
             raise
+
+    def _apply_abstract_format(self, paragraph):
+        """应用摘要格式"""
+        spec = self.format_spec.get('abstract', {})
+        title_spec = spec.get('title', {})
+        content_spec = spec.get('content', {})
+        
+        if "摘要" in paragraph.text:
+            # 应用标题格式
+            self._apply_font_format(paragraph, title_spec)
+            paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        else:
+            # 应用正文格式
+            self._apply_font_format(paragraph, content_spec)
+
+    def _apply_heading_format(self, paragraph):
+        """应用标题格式"""
+        spec = self.format_spec.get('main_text', {}).get('chapter', {})
+        self._apply_font_format(paragraph, spec)
+
+    def _apply_body_format(self, paragraph):
+        """应用正文格式"""
+        spec = self.format_spec.get('main_text', {}).get('body', {})
+        self._apply_font_format(paragraph, spec)
+        if 'line_spacing' in spec:
+            paragraph.paragraph_format.line_spacing = spec['line_spacing']
+
+    def _apply_font_format(self, paragraph, spec):
+        """应用字体格式"""
+        if not spec:
+            return
+            
+        for run in paragraph.runs:
+            if 'font' in spec:
+                run.font.name = spec['font']
+                # 设置中文字体
+                run._element.rPr.rFonts.set(qn('w:eastAsia'), spec['font'])
+            if 'size' in spec:
+                run.font.size = Pt(spec['size'])
     

@@ -23,6 +23,7 @@ class DocumentPage(QWidget):
         self.main_window = main_window
         self.config_manager = ConfigManager()
         self.temp_dir = tempfile.mkdtemp()
+        self.last_directory = self.config_manager.get('last_directory', str(Path.home()))  # 获取上次目录
         self.init_ui()
         
     def init_ui(self):
@@ -125,12 +126,16 @@ class DocumentPage(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "选择Word文档",
-            "",
+            self.last_directory,  # 使用上次的目录
             "Word文档 (*.docx)"
         )
         
         if file_path:
             try:
+                # 保存当前目录
+                self.last_directory = str(Path(file_path).parent)
+                self.config_manager.set('last_directory', self.last_directory)
+                
                 self.main_window.document = Document(file_path, self.config_manager)
                 self.main_window.formatter = WordFormatter(
                     self.main_window.document, 
