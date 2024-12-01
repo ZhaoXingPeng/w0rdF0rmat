@@ -3,10 +3,16 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, 
     QFileDialog, QScrollArea, QLabel,
     QHBoxLayout, QFrame, QSplitter,
-    QDialog, QApplication, QVBoxLayout
+    QDialog, QApplication, QVBoxLayout, QMenu
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import (
+    Qt, QThread, pyqtSignal, QUrl, 
+    QSize, QPoint, QMimeData  # 从 QtCore 导入 QMimeData
+)
+from PyQt6.QtGui import (
+    QPixmap, QImage, QIcon,
+    QDrag, QKeySequence, QAction
+)
 from pathlib import Path
 import tempfile
 import os
@@ -14,7 +20,7 @@ import win32com.client
 import pythoncom
 import fitz  # PyMuPDF
 from src.gui.components.loading_indicator import LoadingIndicator
-from src.utils.temp_manager import TempManager  # 添加导入
+from src.utils.temp_manager import TempManager
 import threading
 import queue
 
@@ -98,6 +104,12 @@ class PreviewPage(QWidget):
         self.last_format_hash = None  # 添加格式哈希缓存
         self.init_ui()
         
+        # 添加快捷键
+        self.save_action = QAction("保存文档", self)
+        self.save_action.setShortcut("Ctrl+S")
+        self.save_action.triggered.connect(self.save_document)
+        self.addAction(self.save_action)
+    
     def init_ui(self):
         """初始化用户界面"""
         layout = QVBoxLayout(self)
@@ -238,6 +250,64 @@ class PreviewPage(QWidget):
         # 添加容器到中央部件
         central_layout.addWidget(container_frame)
         layout.addWidget(central_widget)
+        
+        # 添加保存按钮到右上角
+        save_button = QPushButton("保存文档", self)
+        save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+            QPushButton:pressed {
+                background-color: #005a9e;
+            }
+        """)
+        save_button.clicked.connect(self.save_document)
+        
+        # 添加按钮到标题布局
+        title_layout.addWidget(save_button)
+        
+        # 添加快捷键
+        self.save_action = QAction("保存文档", self)
+        self.save_action.setShortcut("Ctrl+S")
+        self.save_action.triggered.connect(self.save_document)
+        self.addAction(self.save_action)
+        
+        # 添加右键菜单
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+        
+        # 添加窗口大小变化事件处理
+        def resizeEvent(self, event):
+            super().resizeEvent(event)
+            # 更新悬浮按钮位置
+            self.save_fab.move(
+                self.width() - self.save_fab.width() - 20,
+                self.height() - self.save_fab.height() - 20
+            )
+        
+        # 启用拖放
+        self.setAcceptDrops(True)
+        
+        # 添加拖放提示区域
+        self.drag_hint = QLabel("将预览拖放到文件夹以保存", self)
+        self.drag_hint.setStyleSheet("""
+            QLabel {
+                color: #666666;
+                background-color: #f8f9fa;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 13px;
+            }
+        """)
+        self.drag_hint.hide()
     
     def update_preview(self):
         """更新预览内容"""
@@ -347,7 +417,7 @@ class PreviewPage(QWidget):
             
             # 显示原始文档页面
             for page_key in original_pages:
-                page_num = int(page_key.split('_')[1]) + 1  # 提取页码并加1
+                page_num = int(page_key.split('_')[1]) + 1  # 提取页码加1
                 pixmap = page_images[page_key]
                 
                 # 缩放图片以适应宽度
@@ -605,4 +675,63 @@ class PreviewPage(QWidget):
         page_layout.addWidget(page_number)
         
         return page_container
+    
+    def show_context_menu(self, position):
+        """显示右键菜单"""
+        context_menu = QMenu(self)
+        context_menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #f0f9ff;
+                color: #0078d4;
+            }
+        """)
+        
+        # 添加保存选项
+        save_action = context_menu.addAction("保存文档")
+        save_action.setIcon(QIcon(":/icons/save.png"))
+        save_action.triggered.connect(self.save_document)
+        
+        # 显示菜单
+        context_menu.exec(self.mapToGlobal(position))
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_start_position = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
+            
+        if (event.pos() - self.drag_start_position).manhattanLength() < QApplication.startDragDistance():
+            return
+
+        drag = QDrag(self)
+        mimedata = QMimeData()
+        
+        # 创建临时文件
+        temp_file = self.temp_manager.get_temp_path("temp.docx")
+        self.main_window.document.save(temp_file)
+        
+        # 设置拖放数据
+        mimedata.setUrls([QUrl.fromLocalFile(temp_file)])
+        drag.setMimeData(mimedata)
+        
+        # 显示拖放提示
+        self.drag_hint.show()
+        
+        # 执行拖放
+        result = drag.exec(Qt.DropAction.CopyAction)
+        
+        # 隐藏提示
+        self.drag_hint.hide()
     

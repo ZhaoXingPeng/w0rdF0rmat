@@ -144,6 +144,10 @@ class FormatPage(QWidget):
         self.abstract_title_size.setValue(16)
         title_layout.addRow("字号:", self.abstract_title_size)
         
+        self.abstract_title_align = QComboBox()
+        self.abstract_title_align.addItems(["居中", "左对齐", "右对齐"])
+        title_layout.addRow("对齐方式:", self.abstract_title_align)
+        
         title_group.setLayout(title_layout)
         layout.addWidget(title_group)
         
@@ -159,6 +163,53 @@ class FormatPage(QWidget):
         self.abstract_size.setRange(10, 16)
         self.abstract_size.setValue(12)
         content_layout.addRow("字号:", self.abstract_size)
+        
+        self.abstract_line_spacing = QDoubleSpinBox()
+        self.abstract_line_spacing.setRange(1.0, 3.0)
+        self.abstract_line_spacing.setValue(1.5)
+        self.abstract_line_spacing.setSingleStep(0.25)
+        content_layout.addRow("行间距:", self.abstract_line_spacing)
+        
+        self.abstract_para_spacing = QSpinBox()
+        self.abstract_para_spacing.setRange(0, 30)
+        self.abstract_para_spacing.setValue(10)
+        content_layout.addRow("段落间距:", self.abstract_para_spacing)
+        
+        self.abstract_first_line_indent = QSpinBox()
+        self.abstract_first_line_indent.setRange(0, 4)
+        self.abstract_first_line_indent.setValue(2)
+        content_layout.addRow("首行缩进(字符):", self.abstract_first_line_indent)
+        
+        self.abstract_align = QComboBox()
+        self.abstract_align.addItems(["两端对齐", "左对齐", "右对齐", "居中"])
+        content_layout.addRow("对齐方式:", self.abstract_align)
+        
+        # 页边距设置
+        margin_group = QGroupBox("页边距")
+        margin_layout = QFormLayout()
+        
+        self.abstract_margin_top = QSpinBox()
+        self.abstract_margin_top.setRange(10, 50)
+        self.abstract_margin_top.setValue(25)
+        margin_layout.addRow("上边距(毫米):", self.abstract_margin_top)
+        
+        self.abstract_margin_bottom = QSpinBox()
+        self.abstract_margin_bottom.setRange(10, 50)
+        self.abstract_margin_bottom.setValue(25)
+        margin_layout.addRow("下边距(毫米):", self.abstract_margin_bottom)
+        
+        self.abstract_margin_left = QSpinBox()
+        self.abstract_margin_left.setRange(10, 50)
+        self.abstract_margin_left.setValue(30)
+        margin_layout.addRow("左边距(毫米):", self.abstract_margin_left)
+        
+        self.abstract_margin_right = QSpinBox()
+        self.abstract_margin_right.setRange(10, 50)
+        self.abstract_margin_right.setValue(30)
+        margin_layout.addRow("右边距(毫米):", self.abstract_margin_right)
+        
+        margin_group.setLayout(margin_layout)
+        layout.addWidget(margin_group)
         
         content_group.setLayout(content_layout)
         layout.addWidget(content_group)
@@ -307,7 +358,6 @@ class FormatPage(QWidget):
     def apply_format(self):
         """应用格式设置"""
         try:
-            # 获取所有格式设置
             format_settings = {
                 'cover': {
                     'title': {
@@ -322,11 +372,22 @@ class FormatPage(QWidget):
                 'abstract': {
                     'title': {
                         'font': self.abstract_title_font.currentText(),
-                        'size': self.abstract_title_size.value()
+                        'size': self.abstract_title_size.value(),
+                        'align': self.abstract_title_align.currentText()
                     },
                     'content': {
                         'font': self.abstract_font.currentText(),
-                        'size': self.abstract_size.value()
+                        'size': self.abstract_size.value(),
+                        'line_spacing': self.abstract_line_spacing.value(),
+                        'para_spacing': self.abstract_para_spacing.value(),
+                        'first_line_indent': self.abstract_first_line_indent.value(),
+                        'align': self.abstract_align.currentText()
+                    },
+                    'margin': {
+                        'top': self.abstract_margin_top.value(),
+                        'bottom': self.abstract_margin_bottom.value(),
+                        'left': self.abstract_margin_left.value(),
+                        'right': self.abstract_margin_right.value()
                     }
                 },
                 'contents': {
