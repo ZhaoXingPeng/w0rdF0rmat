@@ -251,3 +251,16 @@ class DocumentPage(QWidget):
             os.rmdir(self.temp_dir)
         except Exception as e:
             print(f"清理临时文件失败: {str(e)}") 
+    
+    def handle_document_upload(self, file_path):
+        """处理文档上传"""
+        try:
+            # 处理文档上传的代码...
+            
+            # 设置文档上传状态
+            self.main_window.set_document_uploaded(True)
+            
+            # 其他代码...
+            
+        except Exception as e:
+            self.main_window.show_message(f"文档上传失败：{str(e)}", error=True) 

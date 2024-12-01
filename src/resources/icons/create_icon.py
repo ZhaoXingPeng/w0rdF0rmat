@@ -1,39 +1,61 @@
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import os
 
-def create_icon():
-    # 创建一个 256x256 的图像
-    size = 256
-    image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
+def create_default_icon():
+    """创建默认的应用图标"""
+    # 创建一个256x256的图像
+    icon_size = (256, 256)
+    icon = Image.new('RGBA', icon_size, (255, 255, 255, 0))  # 透明背景
+    draw = ImageDraw.Draw(icon)
     
-    # 绘制圆形背景
-    margin = 10
-    draw.ellipse([margin, margin, size-margin, size-margin], 
-                 fill='#0078d4')  # 使用蓝色背景
+    # 绘制一个蓝色圆形背景
+    padding = 20
+    draw.ellipse(
+        [padding, padding, icon_size[0]-padding, icon_size[1]-padding],
+        fill='#2196F3'  # 使用Material Design蓝色
+    )
     
     # 添加文字
     try:
-        font = ImageFont.truetype("arial.ttf", 100)
+        # 尝试使用系统字体
+        font_size = 120
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except:
+            font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", font_size)
     except:
+        # 如果找不到系统字体，使用默认字体
         font = ImageFont.load_default()
     
-    text = "w0"
-    # 获取文本大小
-    text_bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
+    # 添加文字 "AI"
+    text = "AI"
+    # 获取文本边界框
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     
-    # 计算文本位置使其居中
-    x = (size - text_width) // 2
-    y = (size - text_height) // 2
+    # 计算文字居中位置
+    x = (icon_size[0] - text_width) // 2
+    y = (icon_size[1] - text_height) // 2
     
-    # 绘制文字
+    # 绘制白色文字
     draw.text((x, y), text, fill='white', font=font)
     
-    # 保存为ICO文件
-    icon_path = os.path.join(os.path.dirname(__file__), 'app_icon.ico')
-    image.save(icon_path, format='ICO')
+    # 保存图标
+    icon_path = Path(__file__).parent / "app_icon.ico"
+    # 保存为多尺寸的ICO文件
+    sizes = [(256, 256), (128, 128), (64, 64), (32, 32), (16, 16)]
+    icons = []
+    for size in sizes:
+        icons.append(icon.resize(size, Image.Resampling.LANCZOS))
+    
+    icons[0].save(
+        str(icon_path),
+        format='ICO',
+        sizes=sizes,
+        append_images=icons[1:]
+    )
+    return icon_path
 
-if __name__ == '__main__':
-    create_icon() 
+if __name__ == "__main__":
+    create_default_icon() 

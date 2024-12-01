@@ -21,6 +21,10 @@ class MainWindow(QMainWindow):
         self.document = None
         self.formatter = None
         
+        # 添加状态标志
+        self.document_uploaded = False
+        self.format_configured = False
+        
         # 设置应用图标
         icon_path = Path(__file__).parent.parent / "resources" / "icons" / "app_icon.ico"
         if icon_path.exists():
@@ -126,9 +130,8 @@ class MainWindow(QMainWindow):
         """更新工具栏状态"""
         try:
             # 更新按钮状态
-            has_document = bool(self.document)
-            self.toolbar_buttons[1].setEnabled(has_document)  # 格式按钮
-            self.toolbar_buttons[2].setEnabled(has_document)  # 预览按钮
+            self.toolbar_buttons[1].setEnabled(self.document_uploaded)  # 格式按钮
+            self.toolbar_buttons[2].setEnabled(self.document_uploaded and self.format_configured)  # 预览按钮
             
             # 更新选中状态
             current_widget = self.stacked_widget.currentWidget()
@@ -136,7 +139,7 @@ class MainWindow(QMainWindow):
             # 重置所有按钮状态
             for button in self.toolbar_buttons:
                 button.setProperty("selected", False)
-                button.style().unpolish(button)  # 强制更新样式
+                button.style().unpolish(button)
                 button.style().polish(button)
             
             # 设置当前页面对应的按钮状态
@@ -164,8 +167,8 @@ class MainWindow(QMainWindow):
     
     def show_format_page(self):
         """显示格式页面"""
-        if not self.document:
-            self.show_message("请先打开文档！", error=True)
+        if not self.document_uploaded:
+            self.show_message("请先上传文档！", error=True)
             return
         self.stacked_widget.setCurrentWidget(self.format_page)
         self.show_message("第二步：选择或自定义格式设置")
@@ -173,8 +176,11 @@ class MainWindow(QMainWindow):
     
     def show_preview_page(self):
         """显示预览页面"""
-        if not self.document:
-            self.show_message("请先打开文档！", error=True)
+        if not self.document_uploaded:
+            self.show_message("请先上传文档！", error=True)
+            return
+        if not self.format_configured:
+            self.show_message("请先完成格式设置！", error=True)
             return
         
         try:
@@ -182,8 +188,21 @@ class MainWindow(QMainWindow):
             self.preview_page.update_preview()
             self.show_message("第三步：预览格式化结果并保存")
             self.update_toolbar_state()
-            
         except Exception as e:
             error_msg = f"预览失败: {str(e)}"
             print(error_msg)
             self.show_message(error_msg, error=True)
+    
+    def set_document_uploaded(self, status: bool):
+        """设置文档上传状态"""
+        self.document_uploaded = status
+        self.update_toolbar_state()
+        if status:
+            self.show_message("文档已上传，请设置格式")
+    
+    def set_format_configured(self, status: bool):
+        """设置格式配置状态"""
+        self.format_configured = status
+        self.update_toolbar_state()
+        if status:
+            self.show_message("格式已设置，可以预览文档了")
