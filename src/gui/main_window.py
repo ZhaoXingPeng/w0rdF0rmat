@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, 
-    QToolBar, QStatusBar, QMessageBox, QToolButton
+    QToolBar, QStatusBar, QMessageBox, QToolButton, QPushButton
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
@@ -126,22 +126,34 @@ class MainWindow(QMainWindow):
             msg.setWindowTitle("错误")
             msg.setText(message)
             msg.setIcon(QMessageBox.Icon.Critical)
-            # 设置无声模式和样式
+            
+            # 完全禁用声音和系统样式
             msg.setWindowFlags(
                 Qt.WindowType.Dialog |
                 Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.WindowStaysOnTopHint
+                Qt.WindowType.WindowSystemMenuHint |
+                Qt.WindowType.NoDropShadowWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.MSWindowsFixedSizeDialogHint
             )
+            
             msg.setStyleSheet("""
                 QMessageBox {
                     background-color: #2c2c2c;
                     color: #ffffff;
+                    border: 1px solid #555555;
+                    border-radius: 8px;
                 }
                 QLabel {
                     color: #ffffff;
                     font-size: 14px;
                     padding: 10px;
                 }
+            """)
+            
+            # 自定义按钮
+            ok_button = QPushButton("确定")
+            ok_button.setStyleSheet("""
                 QPushButton {
                     background-color: #0078d4;
                     color: white;
@@ -154,10 +166,19 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {
                     background-color: #106ebe;
                 }
+                QPushButton:pressed {
+                    background-color: #005a9e;
+                }
             """)
+            msg.addButton(ok_button, QMessageBox.ButtonRole.AcceptRole)
+            msg.setDefaultButton(ok_button)
+            
+            # 禁用默认声音
+            msg.setWindowFlags(msg.windowFlags() | Qt.WindowType.WindowDoesNotAcceptFocus)
+            
             msg.exec()
         else:
-            self.statusBar.showMessage(message, 5000)  # 显示5秒
+            self.statusBar.showMessage(message, 5000)
     
     def update_toolbar_state(self):
         """更新工具栏状态"""
