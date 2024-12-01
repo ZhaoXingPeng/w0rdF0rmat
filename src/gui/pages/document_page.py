@@ -140,6 +140,9 @@ class DocumentPage(QWidget):
                 # 显示文档内容
                 self.show_document_content()
                 
+                # 设置文档上传状态为True
+                self.main_window.set_document_uploaded(True)
+                
                 # 更新工具栏状态
                 self.main_window.update_toolbar_state()
                 
