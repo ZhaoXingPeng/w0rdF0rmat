@@ -92,13 +92,46 @@ class WordFormatter:
         """应用标题格式"""
         spec = self.format_spec.get('main_text', {}).get('chapter', {})
         self._apply_font_format(paragraph, spec)
+        
+        # 应用对齐方式
+        align_map = {
+            "居中": WD_PARAGRAPH_ALIGNMENT.CENTER,
+            "左对齐": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "右对齐": WD_PARAGRAPH_ALIGNMENT.RIGHT
+        }
+        if 'align' in spec:
+            paragraph.alignment = align_map.get(spec['align'], WD_PARAGRAPH_ALIGNMENT.LEFT)
+        
+        # 应用段后间距
+        if 'spacing' in spec:
+            paragraph.paragraph_format.space_after = Pt(spec['spacing'])
 
     def _apply_body_format(self, paragraph):
         """应用正文格式"""
         spec = self.format_spec.get('main_text', {}).get('body', {})
         self._apply_font_format(paragraph, spec)
+        
+        # 应用行间距
         if 'line_spacing' in spec:
             paragraph.paragraph_format.line_spacing = spec['line_spacing']
+            
+        # 应用段落间距
+        if 'para_spacing' in spec:
+            paragraph.paragraph_format.space_after = Pt(spec['para_spacing'])
+            
+        # 应用首行缩进
+        if 'first_line_indent' in spec:
+            paragraph.paragraph_format.first_line_indent = Pt(spec['first_line_indent'] * spec.get('size', 12))
+            
+        # 应用对齐方式
+        align_map = {
+            "两端对齐": WD_PARAGRAPH_ALIGNMENT.JUSTIFY,
+            "左对齐": WD_PARAGRAPH_ALIGNMENT.LEFT,
+            "右对齐": WD_PARAGRAPH_ALIGNMENT.RIGHT,
+            "居中": WD_PARAGRAPH_ALIGNMENT.CENTER
+        }
+        if 'align' in spec:
+            paragraph.alignment = align_map.get(spec['align'], WD_PARAGRAPH_ALIGNMENT.JUSTIFY)
 
     def _apply_font_format(self, paragraph, spec):
         """应用字体格式"""

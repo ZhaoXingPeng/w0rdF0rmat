@@ -235,6 +235,15 @@ class FormatPage(QWidget):
         self.chapter_size.setValue(16)
         chapter_layout.addRow("字号:", self.chapter_size)
         
+        self.chapter_align = QComboBox()
+        self.chapter_align.addItems(["左对齐", "居中", "右对齐"])
+        chapter_layout.addRow("对齐方式:", self.chapter_align)
+        
+        self.chapter_spacing = QSpinBox()
+        self.chapter_spacing.setRange(0, 50)
+        self.chapter_spacing.setValue(24)
+        chapter_layout.addRow("段后间距:", self.chapter_spacing)
+        
         chapter_group.setLayout(chapter_layout)
         layout.addWidget(chapter_group)
         
@@ -257,8 +266,49 @@ class FormatPage(QWidget):
         self.line_spacing.setSingleStep(0.25)
         body_layout.addRow("行间距:", self.line_spacing)
         
+        self.para_spacing = QSpinBox()
+        self.para_spacing.setRange(0, 30)
+        self.para_spacing.setValue(10)
+        body_layout.addRow("段落间距:", self.para_spacing)
+        
+        self.first_line_indent = QSpinBox()
+        self.first_line_indent.setRange(0, 4)
+        self.first_line_indent.setValue(2)
+        body_layout.addRow("首行缩进(字符):", self.first_line_indent)
+        
+        self.body_align = QComboBox()
+        self.body_align.addItems(["两端对齐", "左对齐", "右对齐", "居中"])
+        body_layout.addRow("对齐方式:", self.body_align)
+        
         body_group.setLayout(body_layout)
         layout.addWidget(body_group)
+        
+        # 页边距设置
+        margin_group = QGroupBox("页边距")
+        margin_layout = QFormLayout()
+        
+        self.margin_top = QSpinBox()
+        self.margin_top.setRange(10, 50)
+        self.margin_top.setValue(25)
+        margin_layout.addRow("上边距(毫米):", self.margin_top)
+        
+        self.margin_bottom = QSpinBox()
+        self.margin_bottom.setRange(10, 50)
+        self.margin_bottom.setValue(25)
+        margin_layout.addRow("下边距(毫米):", self.margin_bottom)
+        
+        self.margin_left = QSpinBox()
+        self.margin_left.setRange(10, 50)
+        self.margin_left.setValue(30)
+        margin_layout.addRow("左边距(毫米):", self.margin_left)
+        
+        self.margin_right = QSpinBox()
+        self.margin_right.setRange(10, 50)
+        self.margin_right.setValue(30)
+        margin_layout.addRow("右边距(毫米):", self.margin_right)
+        
+        margin_group.setLayout(margin_layout)
+        layout.addWidget(margin_group)
         
         layout.addStretch()
         return tab
@@ -404,12 +454,23 @@ class FormatPage(QWidget):
                 'main_text': {
                     'chapter': {
                         'font': self.chapter_font.currentText(),
-                        'size': self.chapter_size.value()
+                        'size': self.chapter_size.value(),
+                        'align': self.chapter_align.currentText(),
+                        'spacing': self.chapter_spacing.value()
                     },
                     'body': {
                         'font': self.body_font.currentText(),
                         'size': self.body_size.value(),
-                        'line_spacing': self.line_spacing.value()
+                        'line_spacing': self.line_spacing.value(),
+                        'para_spacing': self.para_spacing.value(),
+                        'first_line_indent': self.first_line_indent.value(),
+                        'align': self.body_align.currentText()
+                    },
+                    'margin': {
+                        'top': self.margin_top.value(),
+                        'bottom': self.margin_bottom.value(),
+                        'left': self.margin_left.value(),
+                        'right': self.margin_right.value()
                     }
                 },
                 'references': {
