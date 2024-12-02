@@ -23,6 +23,7 @@ from src.gui.components.loading_indicator import LoadingIndicator
 from src.utils.temp_manager import TempManager
 import threading
 import queue
+import time
 
 class PreviewWorker(QThread):
     """异步预览工作线程"""
@@ -42,16 +43,45 @@ class PreviewWorker(QThread):
         try:
             pythoncom.CoInitialize()
             
+            print(f"开始转换文档: {docx_path}")
+            
             # 创建Word应用实例
             word_app = win32com.client.DispatchEx("Word.Application")
             word_app.Visible = False
             word_app.DisplayAlerts = False
             
-            # 打开文档
-            doc = word_app.Documents.Open(docx_path)
+            print("Word应用创建成功")
             
-            # 保存为PDF
-            doc.SaveAs(pdf_path, FileFormat=17)  # 17 represents PDF format
+            # 等待Word应用就绪
+            time.sleep(1)
+            
+            # 打开文档
+            try:
+                doc = word_app.Documents.Open(
+                    docx_path,
+                    ReadOnly=True,
+                    Visible=False,
+                    ConfirmConversions=False
+                )
+                print("文档打开成功")
+            except Exception as e:
+                raise Exception(f"打开文档失败: {str(e)}")
+            
+            # 等待文档加载完成
+            time.sleep(1)
+            
+            try:
+                # 保存为PDF
+                pdf_path = str(Path(pdf_path).resolve())  # 确保使用完整路径
+                doc.SaveAs2(
+                    FileName=pdf_path,
+                    FileFormat=17,  # wdFormatPDF = 17
+                    AddToRecentFiles=False,
+                    ReadOnlyRecommended=True
+                )
+                print(f"PDF保存成功: {pdf_path}")
+            except Exception as e:
+                raise Exception(f"保存PDF失败: {str(e)}")
             
         except Exception as e:
             raise Exception(f"转换PDF失败: {str(e)}")
@@ -60,17 +90,29 @@ class PreviewWorker(QThread):
             try:
                 # 关闭文档
                 if doc:
-                    doc.Close(SaveChanges=False)
+                    try:
+                        doc.Close(SaveChanges=False)
+                        print("文档已关闭")
+                    except:
+                        pass
+                
                 # 退出Word应用
                 if word_app:
-                    word_app.Quit()
+                    try:
+                        word_app.Quit()
+                        print("Word应用已退出")
+                    except:
+                        pass
+                
                 # 释放COM对象
                 if doc:
                     del doc
                 if word_app:
                     del word_app
-            except:
-                pass
+                
+            except Exception as cleanup_error:
+                print(f"清理资源时出错: {cleanup_error}")
+                
             finally:
                 pythoncom.CoUninitialize()
 
@@ -351,13 +393,13 @@ class PreviewPage(QWidget):
         """更新预览内容"""
         if not self.main_window.document:
             return
-            
+        
         # 检查格式是否发生变化
         current_format = self._calculate_format_hash()
         if not self._needs_reload and current_format == self.last_format_hash:
-            print("格式未变化，无需重���加载预览")
+            print("格式未变化，无需重新加载预览")
             return
-            
+        
         try:
             # 显示加载指示器
             self.show_loading_indicators()
@@ -365,34 +407,48 @@ class PreviewPage(QWidget):
             # 保存当前格式的哈希值
             self.last_format_hash = current_format
             
-            # 保存原始文档
+            # 准备临时文件路径
             original_docx = self.temp_manager.get_temp_path("original.docx")
             formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             
+            # 确保临时文件路径存在
+            Path(original_docx).parent.mkdir(parents=True, exist_ok=True)
+            Path(formatted_docx).parent.mkdir(parents=True, exist_ok=True)
+            
+            print(f"复制文档到临时位置: {original_docx}")
+            
             # 复制原始文档
             import shutil
-            shutil.copy2(self.main_window.document.path, original_docx)
-            shutil.copy2(self.main_window.document.path, formatted_docx)
+            try:
+                shutil.copy2(self.main_window.document.path, original_docx)
+                shutil.copy2(self.main_window.document.path, formatted_docx)
+            except Exception as e:
+                raise Exception(f"复制文档失败: {str(e)}")
             
             # 应用格式到复制的文档
-            from docx import Document
-            formatted_doc = Document(formatted_docx)
-            
-            # 创建新的格式化器并应用格式
-            from src.core.formatter import WordFormatter
-            formatter = WordFormatter(
-                type('TempDoc', (), {'doc': formatted_doc}),
-                self.main_window.config_manager
-            )
-            formatter.format_spec = self.main_window.formatter.format_spec
-            formatter.format()
-            
-            # 保存格式化后的文档
-            formatted_doc.save(formatted_docx)
+            try:
+                from docx import Document
+                formatted_doc = Document(formatted_docx)
+                
+                # 创建新的格式化器并应用格式
+                from src.core.formatter import WordFormatter
+                formatter = WordFormatter(
+                    type('TempDoc', (), {'doc': formatted_doc}),
+                    self.main_window.config_manager
+                )
+                formatter.format_spec = self.main_window.formatter.format_spec
+                formatter.format()
+                
+                # 保存格式化后的文档
+                formatted_doc.save(formatted_docx)
+                print("格式化文档已保存")
+                
+            except Exception as e:
+                raise Exception(f"格式化文档失败: {str(e)}")
             
             # 创建并启动预览工作线程
             self.preview_worker = PreviewWorker(
-                original_docx,  # 使用临时文档路径
+                original_docx,
                 self.temp_manager
             )
             self.preview_worker.progress.connect(self.update_progress)
@@ -401,7 +457,9 @@ class PreviewPage(QWidget):
             self.preview_worker.start()
             
         except Exception as e:
-            self.main_window.show_message(f"预览失败: {str(e)}", error=True)
+            error_msg = f"预览失败: {str(e)}"
+            print(error_msg)
+            self.main_window.show_message(error_msg, error=True)
     
     def show_loading_indicators(self):
         """显示加载指示器"""
@@ -517,18 +575,83 @@ class PreviewPage(QWidget):
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
         """将Word文档转换为PDF"""
-        pythoncom.CoInitialize()
+        word_app = None
+        doc = None
         try:
-            word = win32com.client.Dispatch("Word.Application")
-            word.Visible = False
+            pythoncom.CoInitialize()
             
-            doc = word.Documents.Open(docx_path)
-            doc.SaveAs(pdf_path, FileFormat=17)  # 17 represents PDF format
-            doc.Close()
-            word.Quit()
+            print(f"开始转换文档: {docx_path}")
+            
+            # 创建Word应用实例
+            word_app = win32com.client.DispatchEx("Word.Application")
+            word_app.Visible = False
+            word_app.DisplayAlerts = False
+            
+            print("Word应用创建成功")
+            
+            # 等待Word应用就绪
+            time.sleep(1)
+            
+            # 打开文档
+            try:
+                doc = word_app.Documents.Open(
+                    docx_path,
+                    ReadOnly=True,
+                    Visible=False,
+                    ConfirmConversions=False
+                )
+                print("文档打开成功")
+            except Exception as e:
+                raise Exception(f"打开文档失败: {str(e)}")
+            
+            # 等待文档加载完成
+            time.sleep(1)
+            
+            try:
+                # 保存为PDF
+                pdf_path = str(Path(pdf_path).resolve())  # 确保使用完整路径
+                doc.SaveAs2(
+                    FileName=pdf_path,
+                    FileFormat=17,  # wdFormatPDF = 17
+                    AddToRecentFiles=False,
+                    ReadOnlyRecommended=True
+                )
+                print(f"PDF保存成功: {pdf_path}")
+            except Exception as e:
+                raise Exception(f"保存PDF失败: {str(e)}")
+            
+        except Exception as e:
+            raise Exception(f"转换PDF失败: {str(e)}")
             
         finally:
-            pythoncom.CoUninitialize()
+            try:
+                # 关闭文档
+                if doc:
+                    try:
+                        doc.Close(SaveChanges=False)
+                        print("文档已关闭")
+                    except:
+                        pass
+                
+                # 退出Word应用
+                if word_app:
+                    try:
+                        word_app.Quit()
+                        print("Word应用已退出")
+                    except:
+                        pass
+                
+                # 释放COM对象
+                if doc:
+                    del doc
+                if word_app:
+                    del word_app
+                
+            except Exception as cleanup_error:
+                print(f"清理资源时出错: {cleanup_error}")
+                
+            finally:
+                pythoncom.CoUninitialize()
     
     def save_document(self):
         """保存格式化后的文档"""
@@ -755,7 +878,7 @@ class PreviewPage(QWidget):
         temp_file = self.temp_manager.get_temp_path("temp.docx")
         self.main_window.document.save(temp_file)
         
-        # 设置拖放数据
+        # 设置放数据
         mimedata.setUrls([QUrl.fromLocalFile(temp_file)])
         drag.setMimeData(mimedata)
         
