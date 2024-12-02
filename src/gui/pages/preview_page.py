@@ -315,9 +315,18 @@ class PreviewPage(QWidget):
         if not self.main_window.document:
             return
             
+        # 检查格式是否发生变化
+        current_format = self._calculate_format_hash()
+        if not self._needs_reload and current_format == self.last_format_hash:
+            print("格式未变化，无需重新加载预览")
+            return
+            
         try:
             # 显示加载指示器
             self.show_loading_indicators()
+            
+            # 保存当前格式的哈希值
+            self.last_format_hash = current_format
             
             # 保存原始文档
             original_docx = self.temp_manager.get_temp_path("original.docx")
@@ -526,7 +535,7 @@ class PreviewPage(QWidget):
             self.main_window.show_message(error_msg, error=True)
     
     def cleanup(self):
-        """清理临时文��"""
+        """清理临时文"""
         try:
             for file in os.listdir(self.temp_dir):
                 os.remove(os.path.join(self.temp_dir, file))
@@ -590,33 +599,19 @@ class PreviewPage(QWidget):
     
     def _calculate_format_hash(self):
         """计算当前格式的哈希值"""
-        if not self.main_window.formatter:
+        if not hasattr(self.main_window, 'formatter') or not self.main_window.formatter:
             return None
+            
         import hashlib
         import json
         
-        def format_to_dict(obj):
-            """将格式对象转换为字典"""
-            if hasattr(obj, '__dict__'):
-                return {k: format_to_dict(v) for k, v in obj.__dict__.items()
-                       if not k.startswith('_')}
-            elif isinstance(obj, (list, tuple)):
-                return [format_to_dict(x) for x in obj]
-            elif isinstance(obj, dict):
-                return {k: format_to_dict(v) for k, v in obj.items()}
-            else:
-                return obj
-        
         try:
-            # 将格式规范转换为字典
-            format_dict = format_to_dict(self.main_window.formatter.format_spec)
-            
+            # 获取格式设置
+            format_spec = self.main_window.formatter.format_spec
             # 转换为JSON字符串并排序键值
-            format_str = json.dumps(format_dict, sort_keys=True)
-            
+            format_str = json.dumps(format_spec, sort_keys=True)
             # 计算哈希值
             return hashlib.md5(format_str.encode()).hexdigest()
-            
         except Exception as e:
             print(f"计算格式哈希失败: {str(e)}")
             return None

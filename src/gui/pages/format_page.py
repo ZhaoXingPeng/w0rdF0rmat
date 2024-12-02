@@ -559,20 +559,16 @@ class FormatPage(QWidget):
             # 设置格式已配置状态
             self.main_window.set_format_configured(True)
             
-            # 直接跳转到预览页面
-            self.main_window.show_preview_page()
-            
-            # 在应用格式后，设置预览页面需要重新加载
-            preview_page = self.parent().findChild(PreviewPage)
+            # 设置预览页面需要重新加载
+            preview_page = self.main_window.preview_page  # 直接通过主窗口访问
             if preview_page:
                 preview_page.force_reload()
+                preview_page.update_preview()  # 立即更新预览
             
         except Exception as e:
             error_msg = f"应用格式失败：{str(e)}"
-            print(error_msg)  # 保留调试信息
+            print(error_msg)
             self.main_window.show_message(error_msg, error=True)
-            import traceback
-            traceback.print_exc()
     
     def show_preview(self):
         """显示预览页面"""

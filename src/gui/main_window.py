@@ -239,7 +239,9 @@ class MainWindow(QMainWindow):
         
         try:
             self.stacked_widget.setCurrentWidget(self.preview_page)
-            self.preview_page.update_preview()
+            # 只有在需要时才更新预览
+            if self.preview_page._needs_reload:
+                self.preview_page.update_preview()
             self.show_message("第三步：预览格式化结果并保存")
             self.update_toolbar_state()
         except Exception as e:
