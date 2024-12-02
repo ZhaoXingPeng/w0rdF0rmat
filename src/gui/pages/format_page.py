@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt
+from src.gui.pages.preview_page import PreviewPage
 
 class FormatPage(QWidget):
     def __init__(self, main_window):
@@ -247,7 +248,7 @@ class FormatPage(QWidget):
         chapter_group.setLayout(chapter_layout)
         layout.addWidget(chapter_group)
         
-        # 正��格式
+        # 正格式
         body_group = QGroupBox("正文格式")
         body_layout = QFormLayout()
         
@@ -560,6 +561,11 @@ class FormatPage(QWidget):
             
             # 直接跳转到预览页面
             self.main_window.show_preview_page()
+            
+            # 在应用格式后，设置预览页面需要重新加载
+            preview_page = self.parent().findChild(PreviewPage)
+            if preview_page:
+                preview_page.force_reload()
             
         except Exception as e:
             error_msg = f"应用格式失败：{str(e)}"

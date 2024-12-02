@@ -260,3 +260,10 @@ class MainWindow(QMainWindow):
         self.update_toolbar_state()
         if status:
             self.show_message("格式已设置，可以预览文档了")
+    
+    def switch_to_preview(self):
+        # 切换到预览页面时，使用当前的预览页面状态
+        current_page = self.stacked_widget.currentWidget()
+        preview_page = self.findChild(PreviewPage)
+        if preview_page:
+            preview_page.show_preview(self.get_current_text(), self.get_format_settings())

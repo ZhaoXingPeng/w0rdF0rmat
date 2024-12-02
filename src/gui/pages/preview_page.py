@@ -102,6 +102,7 @@ class PreviewPage(QWidget):
         self.temp_manager = TempManager()
         self.preview_worker = None
         self.last_format_hash = None  # 添加格式哈希缓存
+        self._needs_reload = True  # 添加重新加载标志
         self.init_ui()
         
         # 添加快捷键
@@ -525,7 +526,7 @@ class PreviewPage(QWidget):
             self.main_window.show_message(error_msg, error=True)
     
     def cleanup(self):
-        """清理临时文件"""
+        """清理临时文��"""
         try:
             for file in os.listdir(self.temp_dir):
                 os.remove(os.path.join(self.temp_dir, file))
@@ -734,4 +735,15 @@ class PreviewPage(QWidget):
         
         # 隐藏提示
         self.drag_hint.hide()
+    
+    def show_preview(self, text, format_settings=None):
+        # 只有在需要重新加载时才执行预览
+        if self._needs_reload:
+            # 执行预览逻辑
+            # ... 现有的预览代码 ...
+            self._needs_reload = False  # 预览完成后重置标志
+        
+    def force_reload(self):
+        """强制设置需要重新加载"""
+        self._needs_reload = True
     
