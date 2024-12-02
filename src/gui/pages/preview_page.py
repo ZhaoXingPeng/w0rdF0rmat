@@ -26,30 +26,53 @@ import queue
 
 class PreviewWorker(QThread):
     """异步预览工作线程"""
-    progress = pyqtSignal(int)  # 进度信号
-    finished = pyqtSignal(dict)  # 完成信号
-    error = pyqtSignal(str)  # 错误信号
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
 
     def __init__(self, doc_path, temp_manager):
         super().__init__()
         self.doc_path = doc_path
         self.temp_manager = temp_manager
-        self.cache = {}  # 缓存预览图像
 
     def convert_word_to_pdf(self, docx_path, pdf_path):
         """将Word文档转换为PDF"""
-        pythoncom.CoInitialize()
+        word_app = None
+        doc = None
         try:
-            word = win32com.client.Dispatch("Word.Application")
-            word.Visible = False
+            pythoncom.CoInitialize()
             
-            doc = word.Documents.Open(docx_path)
+            # 创建Word应用实例
+            word_app = win32com.client.DispatchEx("Word.Application")
+            word_app.Visible = False
+            word_app.DisplayAlerts = False
+            
+            # 打开文档
+            doc = word_app.Documents.Open(docx_path)
+            
+            # 保存为PDF
             doc.SaveAs(pdf_path, FileFormat=17)  # 17 represents PDF format
-            doc.Close()
-            word.Quit()
+            
+        except Exception as e:
+            raise Exception(f"转换PDF失败: {str(e)}")
             
         finally:
-            pythoncom.CoUninitialize()
+            try:
+                # 关闭文档
+                if doc:
+                    doc.Close(SaveChanges=False)
+                # 退出Word应用
+                if word_app:
+                    word_app.Quit()
+                # 释放COM对象
+                if doc:
+                    del doc
+                if word_app:
+                    del word_app
+            except:
+                pass
+            finally:
+                pythoncom.CoUninitialize()
 
     def run(self):
         try:
@@ -57,43 +80,57 @@ class PreviewWorker(QThread):
             
             # 转换原始文档为PDF
             original_pdf = self.temp_manager.get_temp_path("original.pdf")
-            self.convert_word_to_pdf(self.doc_path, original_pdf)
+            try:
+                self.convert_word_to_pdf(self.doc_path, original_pdf)
+            except Exception as e:
+                self.error.emit(f"转换原始文档失败: {str(e)}")
+                return
             
             # 转换格式化文档为PDF
             formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             formatted_pdf = self.temp_manager.get_temp_path("formatted.pdf")
-            self.convert_word_to_pdf(formatted_docx, formatted_pdf)
+            try:
+                self.convert_word_to_pdf(formatted_docx, formatted_pdf)
+            except Exception as e:
+                self.error.emit(f"转换格式化文档失败: {str(e)}")
+                return
             
             # 使用PyMuPDF渲染页面
-            doc = fitz.open(original_pdf)  # 打开原始文档
-            formatted_doc = fitz.open(formatted_pdf)  # 打开格式化文档
-            
             page_images = {}
-            total_pages = max(len(doc), len(formatted_doc))
-            
-            for page_num in range(total_pages):
-                self.progress.emit(int((page_num + 1) * 100 / total_pages))
+            try:
+                doc = fitz.open(original_pdf)
+                formatted_doc = fitz.open(formatted_pdf)
                 
-                # 渲染原始页面
-                if page_num < len(doc):
-                    page = doc[page_num]
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                    img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                    page_images[f"original_{page_num}"] = QPixmap.fromImage(img)
+                total_pages = max(len(doc), len(formatted_doc))
                 
-                # 渲染格式化页面
-                if page_num < len(formatted_doc):
-                    page = formatted_doc[page_num]
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                    img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                    page_images[f"formatted_{page_num}"] = QPixmap.fromImage(img)
+                for page_num in range(total_pages):
+                    self.progress.emit(int((page_num + 1) * 100 / total_pages))
+                    
+                    # 渲染原始页面
+                    if page_num < len(doc):
+                        page = doc[page_num]
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                        img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+                        page_images[f"original_{page_num}"] = QPixmap.fromImage(img)
+                    
+                    # 渲染格式化页面
+                    if page_num < len(formatted_doc):
+                        page = formatted_doc[page_num]
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                        img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+                        page_images[f"formatted_{page_num}"] = QPixmap.fromImage(img)
+                
+                doc.close()
+                formatted_doc.close()
+                
+            except Exception as e:
+                self.error.emit(f"渲染预览失败: {str(e)}")
+                return
             
-            doc.close()
-            formatted_doc.close()
             self.finished.emit(page_images)
             
         except Exception as e:
-            self.error.emit(str(e))
+            self.error.emit(f"预览生成失败: {str(e)}")
 
 class PreviewPage(QWidget):
     def __init__(self, main_window):
@@ -318,7 +355,7 @@ class PreviewPage(QWidget):
         # 检查格式是否发生变化
         current_format = self._calculate_format_hash()
         if not self._needs_reload and current_format == self.last_format_hash:
-            print("格式未变化，无需重新加载预览")
+            print("格式未变化，无需重���加载预览")
             return
             
         try:
