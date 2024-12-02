@@ -565,6 +565,9 @@ class FormatPage(QWidget):
                 preview_page.force_reload()
                 preview_page.update_preview()  # 立即更新预览
             
+            # 跳转到预览页面
+            self.main_window.show_preview_page()
+            
         except Exception as e:
             error_msg = f"应用格式失败：{str(e)}"
             print(error_msg)

@@ -1,41 +1,58 @@
 import os
 import tempfile
-import atexit
-import shutil
+import uuid
 from pathlib import Path
 
 class TempManager:
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(TempManager, cls).__new__(cls)
-            cls._instance._initialize()
-        return cls._instance
-    
-    def _initialize(self):
-        """初始化临时文件目录"""
-        # 在系统临时目录下创建一个固定的子目录
-        base_temp = tempfile.gettempdir()
-        self.temp_dir = os.path.join(base_temp, 'word_formatter')
-        
-        # 确保目录存在且为空
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-        os.makedirs(self.temp_dir)
-        
-        # 注册程序退出时的清理函数
-        atexit.register(self.cleanup)
-    
+    def __init__(self):
+        # 在用户临时目录下创建一个唯一的子目录
+        self.base_dir = Path(tempfile.gettempdir()) / f"word_formatter_{uuid.uuid4().hex}"
+        self.ensure_temp_dir()
+
+    def ensure_temp_dir(self):
+        """确保临时目录存在且有正确的权限"""
+        try:
+            # 如果目录已存在，先删除
+            if self.base_dir.exists():
+                self.cleanup()
+            
+            # 创建新的临时目录
+            self.base_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 确保目录有正确的权限
+            os.chmod(str(self.base_dir), 0o700)  # 设置目录权限为当前用户可读写执行
+            
+        except Exception as e:
+            print(f"创建临时目录失败: {str(e)}")
+            # 如果创建自定义目录失败，回退到系统临时目录
+            self.base_dir = Path(tempfile.gettempdir())
+
     def get_temp_path(self, filename):
         """获取临时文件路径"""
-        return os.path.join(self.temp_dir, filename)
-    
+        # 确保文件名是安全的
+        safe_filename = Path(filename).name  # 只使用文件名部分
+        temp_path = self.base_dir / safe_filename
+        
+        # 确保父目录存在
+        temp_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        return str(temp_path)
+
     def cleanup(self):
-        """清理所有临时文件"""
+        """清理临时文件和目录"""
         try:
-            if os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir)
-                print(f"临时文件已清理: {self.temp_dir}")
+            if self.base_dir.exists():
+                for item in self.base_dir.glob('**/*'):
+                    try:
+                        if item.is_file():
+                            item.unlink()
+                        elif item.is_dir():
+                            item.rmdir()
+                    except Exception as e:
+                        print(f"清理临时文件失败: {str(e)}")
+                
+                # 删除主目录
+                if self.base_dir.exists():
+                    self.base_dir.rmdir()
         except Exception as e:
-            print(f"清理临时文件失败: {str(e)}") 
+            print(f"清理临时目录失败: {str(e)}") 
