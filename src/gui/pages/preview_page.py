@@ -35,9 +35,11 @@ class PreviewWorker(QThread):
         super().__init__()
         self.original_doc_path = original_doc_path
         self.formatted_doc_path = formatted_doc_path
+        self._is_running = False
 
     def run(self):
         try:
+            self._is_running = True
             print("开始生成预览...")
             page_images = {}
             
@@ -46,24 +48,38 @@ class PreviewWorker(QThread):
             
             # 渲染原始文档
             try:
+                if not self._is_running:
+                    return
                 original_doc = Document(self.original_doc_path)
                 page_images.update(self._render_document(original_doc, "original"))
             except Exception as e:
+                print(f"渲染原始文档失败: {str(e)}")
                 self.error.emit(f"渲染原始文档失败: {str(e)}")
                 return
             
             # 渲染格式化文档
             try:
+                if not self._is_running:
+                    return
                 formatted_doc = Document(self.formatted_doc_path)
                 page_images.update(self._render_document(formatted_doc, "formatted"))
             except Exception as e:
+                print(f"渲染格式化文档失败: {str(e)}")
                 self.error.emit(f"渲染格式化文档失败: {str(e)}")
                 return
             
-            self.finished.emit(page_images)
+            if self._is_running:
+                self.finished.emit(page_images)
             
         except Exception as e:
+            print(f"预览生成失败: {str(e)}")
             self.error.emit(f"预览生成失败: {str(e)}")
+        finally:
+            self._is_running = False
+
+    def stop(self):
+        """停止预览生成"""
+        self._is_running = False
 
     def _render_document(self, doc, prefix):
         """渲染文档为图像"""
@@ -74,46 +90,93 @@ class PreviewWorker(QThread):
         page_height = 1200  # 固定页面高度
         page_width = int(page_height * 0.7)  # A4纸比例
         
-        current_page = Image.new('RGB', (page_width, page_height), 'white')
-        draw = ImageDraw.Draw(current_page)
-        y_position = 50
-        page_num = 0
+        # 设置更大的字体大小和行间距
+        font_size = 16
+        line_height = int(font_size * 1.5)  # 1.5倍行间距
+        margin_top = 80
+        margin_bottom = 80
+        margin_left = 80
+        margin_right = 80
         
-        # 使用系统字体
         try:
-            font = ImageFont.truetype("simsun.ttc", 12)  # 宋体
+            # 尝试加载多个字体
+            for font_name in ["simsun.ttc", "simhei.ttf", "msyh.ttc", "arial.ttf"]:
+                try:
+                    font = ImageFont.truetype(font_name, font_size)
+                    break
+                except:
+                    continue
+            else:
+                font = ImageFont.load_default()
+                font_size = 12
+                line_height = 16
         except:
             font = ImageFont.load_default()
+            font_size = 12
+            line_height = 16
         
-        for para in doc.paragraphs:
-            text = para.text
-            # 计算文本高度
-            text_width = page_width - 100  # 左右边距各50
+        current_page = Image.new('RGB', (page_width, page_height), 'white')
+        draw = ImageDraw.Draw(current_page)
+        y_position = margin_top
+        page_num = 0
+        
+        # 添加页眉
+        header_text = "原始文档" if prefix == "original" else "格式化预览"
+        draw.text((margin_left, 30), header_text, font=font, fill='gray')
+        
+        total_paragraphs = len(doc.paragraphs)
+        for i, para in enumerate(doc.paragraphs):
+            text = para.text.strip()
+            if not text:  # 跳过空段落，但添加一定间距
+                y_position += line_height // 2
+                continue
+            
+            # 计算文本宽度和换行
+            text_width = page_width - margin_left - margin_right
             wrapped_text = self._wrap_text(text, font, text_width)
             
+            # 计算段落总高度
+            para_height = len(wrapped_text) * line_height
+            
             # 检查是否需要新页面
-            text_height = len(wrapped_text) * 20  # 每行20像素高
-            if y_position + text_height > page_height - 50:
+            if y_position + para_height > page_height - margin_bottom:
+                # 添加页码
+                page_number_text = f"- {page_num + 1} -"
+                w = draw.textlength(page_number_text, font=font)
+                draw.text((page_width/2 - w/2, page_height - 50), 
+                         page_number_text, font=font, fill='gray')
+                
                 # 保存当前页面
                 images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
                 page_num += 1
+                
                 # 创建新页面
                 current_page = Image.new('RGB', (page_width, page_height), 'white')
                 draw = ImageDraw.Draw(current_page)
-                y_position = 50
+                y_position = margin_top
+                
+                # 添加页眉
+                draw.text((margin_left, 30), header_text, font=font, fill='gray')
             
             # 绘制文本
             for line in wrapped_text:
-                draw.text((50, y_position), line, font=font, fill='black')
-                y_position += 20
+                draw.text((margin_left, y_position), line, font=font, fill='black')
+                y_position += line_height
             
-            y_position += 10  # 段落间距
+            # 段落间距
+            y_position += line_height // 2
             
             # 更新进度
-            self.progress.emit(int(page_num * 100 / len(doc.paragraphs)))
+            self.progress.emit(int((i + 1) * 100 / total_paragraphs))
         
         # 保存最后一页
-        if y_position > 50:
+        if y_position > margin_top:
+            # 添加页码
+            page_number_text = f"- {page_num + 1} -"
+            w = draw.textlength(page_number_text, font=font)
+            draw.text((page_width/2 - w/2, page_height - 50), 
+                     page_number_text, font=font, fill='gray')
+            
             images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
         
         return images
@@ -124,20 +187,34 @@ class PreviewWorker(QThread):
         current_line = []
         current_width = 0
         
+        # 修改字体大小测量方法
+        def get_text_width(text):
+            try:
+                # 新版本 PIL
+                return font.getlength(text)
+            except AttributeError:
+                try:
+                    # 旧版本 PIL
+                    return font.getsize(text)[0]
+                except:
+                    # 如果都失败了，使用估算
+                    return len(text) * font.size * 0.6
+        
         for word in text.split():
-            word_width = font.getsize(word + ' ')[0]
+            word_width = get_text_width(word + ' ')
             if current_width + word_width <= max_width:
                 current_line.append(word)
                 current_width += word_width
             else:
-                lines.append(' '.join(current_line))
+                if current_line:  # 确保当前行不为空
+                    lines.append(' '.join(current_line))
                 current_line = [word]
-                current_width = word_width
+                current_width = get_text_width(word)
         
-        if current_line:
+        if current_line:  # 添加最后一行
             lines.append(' '.join(current_line))
         
-        return lines
+        return lines if lines else [text]  # 如果没有分行，返回原文本
 
     def _convert_pil_to_qpixmap(self, pil_image):
         """将PIL图像转换为QPixmap"""
@@ -150,8 +227,8 @@ class PreviewPage(QWidget):
         self.main_window = main_window
         self.temp_manager = TempManager()
         self.preview_worker = None
-        self.last_format_hash = None  # 添加格式哈希缓存
-        self._needs_reload = True  # 添加重新加载标志
+        self.last_format_hash = None
+        self._needs_reload = True
         self.init_ui()
         
         # 添加快捷键
@@ -217,7 +294,7 @@ class PreviewPage(QWidget):
         container_layout.setContentsMargins(1, 1, 1, 1)
         container_layout.setSpacing(0)
         
-        # 创建分割视图
+        # 建分割视图
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(1)
@@ -321,7 +398,7 @@ class PreviewPage(QWidget):
         """)
         save_button.clicked.connect(self.save_document)
         
-        # 添加按钮到标题布局
+        # 添加按钮到标题局
         title_layout.addWidget(save_button)
         
         # 添加快捷键
@@ -363,19 +440,15 @@ class PreviewPage(QWidget):
         """更新预览内容"""
         if not self.main_window.document:
             return
-        
-        # 检查格式是否发生变化
-        current_format = self._calculate_format_hash()
-        if not self._needs_reload and current_format == self.last_format_hash:
-            print("格式未变化，无需重新加载预览")
-            return
+            
+        # 如果有正在运行的预览任务，先停止它
+        if self.preview_worker and self.preview_worker.isRunning():
+            self.preview_worker.stop()
+            self.preview_worker.wait()
         
         try:
             # 显示加载指示器
             self.show_loading_indicators()
-            
-            # 保存当前格式的哈希值
-            self.last_format_hash = current_format
             
             # 准备临时文件
             original_docx = self.temp_manager.get_temp_path("original.docx")
@@ -383,19 +456,34 @@ class PreviewPage(QWidget):
             
             # 复制和格式化文档
             try:
-                import shutil
-                shutil.copy2(self.main_window.document.path, original_docx)
-                shutil.copy2(self.main_window.document.path, formatted_docx)
-                
-                # 应用格式
+                # 直接使用python-docx打开原始文档
                 from docx import Document
-                formatted_doc = Document(formatted_docx)
-                formatter = self.main_window.formatter
-                formatter.doc = formatted_doc
-                formatter.format()
-                formatted_doc.save(formatted_docx)
                 
+                # 打开原始文档
+                try:
+                    original_doc = Document(self.main_window.document.path)
+                    # 保存为新文件
+                    original_doc.save(original_docx)
+                    print("原始文档保存成功")
+                    
+                    # 创建格式化文档的副本
+                    formatted_doc = Document(self.main_window.document.path)
+                    
+                    # 应用格式
+                    formatter = self.main_window.formatter
+                    formatter.doc = formatted_doc
+                    formatter.format()
+                    
+                    # 保存格式化文档
+                    formatted_doc.save(formatted_docx)
+                    print("格式化文档保存成功")
+                    
+                except Exception as e:
+                    print(f"文档处理失败: {str(e)}")
+                    raise Exception(f"文档处理失败: {str(e)}")
+                    
             except Exception as e:
+                print(f"准备预览文档失败: {str(e)}")
                 raise Exception(f"准备预览文档失败: {str(e)}")
             
             # 创建并启动预览工作线程
@@ -415,7 +503,7 @@ class PreviewPage(QWidget):
         self.clear_layout(self.original_layout)
         self.clear_layout(self.formatted_layout)
         
-        # 创建预览区域占位符并保存加载指示器的引用
+        # 创建预览区域占位并保存加载示器的引用
         self.loading_indicators = []
         
         for layout in [self.original_layout, self.formatted_layout]:
@@ -520,7 +608,21 @@ class PreviewPage(QWidget):
     
     def handle_preview_error(self, error_msg):
         """处理预览错误"""
+        print(f"预览错误: {error_msg}")
         self.main_window.show_message(f"预览失败: {error_msg}", error=True)
+        # 清除加载指示器
+        self.clear_loading_indicators()
+    
+    def clear_loading_indicators(self):
+        """清除加载指示器"""
+        try:
+            if hasattr(self, 'loading_indicators'):
+                for loading in self.loading_indicators:
+                    loading.stop()
+                    loading.deleteLater()
+                self.loading_indicators.clear()
+        except Exception as e:
+            print(f"清除加载指示器失败: {str(e)}")
     
     def convert_word_to_pdf(self, docx_path, pdf_path):
         """将Word文档转换为PDF"""
