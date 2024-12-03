@@ -31,148 +31,118 @@ class PreviewWorker(QThread):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
 
-    def __init__(self, doc_path, temp_manager):
+    def __init__(self, original_doc_path, formatted_doc_path):
         super().__init__()
-        self.doc_path = doc_path
-        self.temp_manager = temp_manager
-
-    def convert_word_to_pdf(self, docx_path, pdf_path):
-        """将Word文档转换为PDF"""
-        word_app = None
-        doc = None
-        try:
-            pythoncom.CoInitialize()
-            
-            print(f"开始转换文档: {docx_path}")
-            
-            # 创建Word应用实例
-            word_app = win32com.client.DispatchEx("Word.Application")
-            word_app.Visible = False
-            word_app.DisplayAlerts = False
-            
-            print("Word应用创建成功")
-            
-            # 等待Word应用就绪
-            time.sleep(1)
-            
-            # 打开文档
-            try:
-                doc = word_app.Documents.Open(
-                    docx_path,
-                    ReadOnly=True,
-                    Visible=False,
-                    ConfirmConversions=False
-                )
-                print("文档打开成功")
-            except Exception as e:
-                raise Exception(f"打开文档失败: {str(e)}")
-            
-            # 等待文档加载完成
-            time.sleep(1)
-            
-            try:
-                # 保存为PDF
-                pdf_path = str(Path(pdf_path).resolve())  # 确保使用完整路径
-                doc.SaveAs2(
-                    FileName=pdf_path,
-                    FileFormat=17,  # wdFormatPDF = 17
-                    AddToRecentFiles=False,
-                    ReadOnlyRecommended=True
-                )
-                print(f"PDF保存成功: {pdf_path}")
-            except Exception as e:
-                raise Exception(f"保存PDF失败: {str(e)}")
-            
-        except Exception as e:
-            raise Exception(f"转换PDF失败: {str(e)}")
-            
-        finally:
-            try:
-                # 关闭文档
-                if doc:
-                    try:
-                        doc.Close(SaveChanges=False)
-                        print("文档已关闭")
-                    except:
-                        pass
-                
-                # 退出Word应用
-                if word_app:
-                    try:
-                        word_app.Quit()
-                        print("Word应用已退出")
-                    except:
-                        pass
-                
-                # 释放COM对象
-                if doc:
-                    del doc
-                if word_app:
-                    del word_app
-                
-            except Exception as cleanup_error:
-                print(f"清理资源时出错: {cleanup_error}")
-                
-            finally:
-                pythoncom.CoUninitialize()
+        self.original_doc_path = original_doc_path
+        self.formatted_doc_path = formatted_doc_path
 
     def run(self):
         try:
             print("开始生成预览...")
-            
-            # 转换原始文档为PDF
-            original_pdf = self.temp_manager.get_temp_path("original.pdf")
-            try:
-                self.convert_word_to_pdf(self.doc_path, original_pdf)
-            except Exception as e:
-                self.error.emit(f"转换原始文档失败: {str(e)}")
-                return
-            
-            # 转换格式化文档为PDF
-            formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
-            formatted_pdf = self.temp_manager.get_temp_path("formatted.pdf")
-            try:
-                self.convert_word_to_pdf(formatted_docx, formatted_pdf)
-            except Exception as e:
-                self.error.emit(f"转换格式化文档失败: {str(e)}")
-                return
-            
-            # 使用PyMuPDF渲染页面
             page_images = {}
+            
+            # 直接从docx文件渲染预览
+            from docx import Document
+            
+            # 渲染原始文档
             try:
-                doc = fitz.open(original_pdf)
-                formatted_doc = fitz.open(formatted_pdf)
-                
-                total_pages = max(len(doc), len(formatted_doc))
-                
-                for page_num in range(total_pages):
-                    self.progress.emit(int((page_num + 1) * 100 / total_pages))
-                    
-                    # 渲染原始页面
-                    if page_num < len(doc):
-                        page = doc[page_num]
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                        img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                        page_images[f"original_{page_num}"] = QPixmap.fromImage(img)
-                    
-                    # 渲染格式化页面
-                    if page_num < len(formatted_doc):
-                        page = formatted_doc[page_num]
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                        img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
-                        page_images[f"formatted_{page_num}"] = QPixmap.fromImage(img)
-                
-                doc.close()
-                formatted_doc.close()
-                
+                original_doc = Document(self.original_doc_path)
+                page_images.update(self._render_document(original_doc, "original"))
             except Exception as e:
-                self.error.emit(f"渲染预览失败: {str(e)}")
+                self.error.emit(f"渲染原始文档失败: {str(e)}")
+                return
+            
+            # 渲染格式化文档
+            try:
+                formatted_doc = Document(self.formatted_doc_path)
+                page_images.update(self._render_document(formatted_doc, "formatted"))
+            except Exception as e:
+                self.error.emit(f"渲染格式化文档失败: {str(e)}")
                 return
             
             self.finished.emit(page_images)
             
         except Exception as e:
             self.error.emit(f"预览生成失败: {str(e)}")
+
+    def _render_document(self, doc, prefix):
+        """渲染文档为图像"""
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        images = {}
+        page_height = 1200  # 固定页面高度
+        page_width = int(page_height * 0.7)  # A4纸比例
+        
+        current_page = Image.new('RGB', (page_width, page_height), 'white')
+        draw = ImageDraw.Draw(current_page)
+        y_position = 50
+        page_num = 0
+        
+        # 使用系统字体
+        try:
+            font = ImageFont.truetype("simsun.ttc", 12)  # 宋体
+        except:
+            font = ImageFont.load_default()
+        
+        for para in doc.paragraphs:
+            text = para.text
+            # 计算文本高度
+            text_width = page_width - 100  # 左右边距各50
+            wrapped_text = self._wrap_text(text, font, text_width)
+            
+            # 检查是否需要新页面
+            text_height = len(wrapped_text) * 20  # 每行20像素高
+            if y_position + text_height > page_height - 50:
+                # 保存当前页面
+                images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
+                page_num += 1
+                # 创建新页面
+                current_page = Image.new('RGB', (page_width, page_height), 'white')
+                draw = ImageDraw.Draw(current_page)
+                y_position = 50
+            
+            # 绘制文本
+            for line in wrapped_text:
+                draw.text((50, y_position), line, font=font, fill='black')
+                y_position += 20
+            
+            y_position += 10  # 段落间距
+            
+            # 更新进度
+            self.progress.emit(int(page_num * 100 / len(doc.paragraphs)))
+        
+        # 保存最后一页
+        if y_position > 50:
+            images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
+        
+        return images
+
+    def _wrap_text(self, text, font, max_width):
+        """将文本按宽度换行"""
+        lines = []
+        current_line = []
+        current_width = 0
+        
+        for word in text.split():
+            word_width = font.getsize(word + ' ')[0]
+            if current_width + word_width <= max_width:
+                current_line.append(word)
+                current_width += word_width
+            else:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+                current_width = word_width
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        return lines
+
+    def _convert_pil_to_qpixmap(self, pil_image):
+        """将PIL图像转换为QPixmap"""
+        from PIL import ImageQt
+        return QPixmap.fromImage(ImageQt.ImageQt(pil_image))
 
 class PreviewPage(QWidget):
     def __init__(self, main_window):
@@ -407,50 +377,29 @@ class PreviewPage(QWidget):
             # 保存当前格式的哈希值
             self.last_format_hash = current_format
             
-            # 准备临时文件路径
+            # 准备临时文件
             original_docx = self.temp_manager.get_temp_path("original.docx")
             formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             
-            # 确保临时文件路径存在
-            Path(original_docx).parent.mkdir(parents=True, exist_ok=True)
-            Path(formatted_docx).parent.mkdir(parents=True, exist_ok=True)
-            
-            print(f"复制文档到临时位置: {original_docx}")
-            
-            # 复制原始文档
-            import shutil
+            # 复制和格式化文档
             try:
+                import shutil
                 shutil.copy2(self.main_window.document.path, original_docx)
                 shutil.copy2(self.main_window.document.path, formatted_docx)
-            except Exception as e:
-                raise Exception(f"复制文档失败: {str(e)}")
-            
-            # 应用格式到复制的文档
-            try:
+                
+                # 应用格式
                 from docx import Document
                 formatted_doc = Document(formatted_docx)
-                
-                # 创建新的格式化器并应用格式
-                from src.core.formatter import WordFormatter
-                formatter = WordFormatter(
-                    type('TempDoc', (), {'doc': formatted_doc}),
-                    self.main_window.config_manager
-                )
-                formatter.format_spec = self.main_window.formatter.format_spec
+                formatter = self.main_window.formatter
+                formatter.doc = formatted_doc
                 formatter.format()
-                
-                # 保存格式化后的文档
                 formatted_doc.save(formatted_docx)
-                print("格式化文档已保存")
                 
             except Exception as e:
-                raise Exception(f"格式化文档失败: {str(e)}")
+                raise Exception(f"准备预览文档失败: {str(e)}")
             
             # 创建并启动预览工作线程
-            self.preview_worker = PreviewWorker(
-                original_docx,
-                self.temp_manager
-            )
+            self.preview_worker = PreviewWorker(original_docx, formatted_docx)
             self.preview_worker.progress.connect(self.update_progress)
             self.preview_worker.finished.connect(self.show_preview_images)
             self.preview_worker.error.connect(self.handle_preview_error)
@@ -589,7 +538,7 @@ class PreviewPage(QWidget):
             
             print("Word应用创建成功")
             
-            # 等待Word应用就绪
+            # 等待Word用就绪
             time.sleep(1)
             
             # 打开文档
