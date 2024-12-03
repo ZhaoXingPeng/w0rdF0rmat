@@ -35,151 +35,171 @@ class PreviewWorker(QThread):
         super().__init__()
         self.original_doc_path = original_doc_path
         self.formatted_doc_path = formatted_doc_path
-        self._is_running = False
+        self._is_running = True
+        print("预览工作线程已创建")
 
     def run(self):
         try:
-            self._is_running = True
             print("开始生成预览...")
             page_images = {}
-            
-            # 直接从docx文件渲染预览
-            from docx import Document
             
             # 渲染原始文档
             try:
                 if not self._is_running:
                     return
+                    
+                # 检查文件是否存在
+                if not os.path.exists(self.original_doc_path):
+                    raise Exception(f"找不到原始文档: {self.original_doc_path}")
+                
+                from docx import Document
                 original_doc = Document(self.original_doc_path)
+                
+                # 渲染前检查字体和其他资源
+                try:
+                    from PIL import Image, ImageDraw, ImageFont
+                    # 测试字体加载
+                    test_font = ImageFont.load_default()
+                except Exception as e:
+                    raise Exception(f"初始化渲染环境失败: {str(e)}")
+                
+                # 渲染文档
                 page_images.update(self._render_document(original_doc, "original"))
+                print("原始文档渲染完成")
+                
             except Exception as e:
                 print(f"渲染原始文档失败: {str(e)}")
-                self.error.emit(f"渲染原始文档失败: {str(e)}")
+                self.error.emit(str(e))
                 return
             
             # 渲染格式化文档
             try:
                 if not self._is_running:
                     return
+                    
+                # 检查文件是否存在
+                if not os.path.exists(self.formatted_doc_path):
+                    raise Exception(f"找不到格式化文档: {self.formatted_doc_path}")
+                
                 formatted_doc = Document(self.formatted_doc_path)
                 page_images.update(self._render_document(formatted_doc, "formatted"))
+                print("格式化文档渲染完成")
+                
             except Exception as e:
                 print(f"渲染格式化文档失败: {str(e)}")
-                self.error.emit(f"渲染格式化文档失败: {str(e)}")
+                self.error.emit(str(e))
                 return
             
             if self._is_running:
+                print("发送渲染结果...")
                 self.finished.emit(page_images)
             
         except Exception as e:
             print(f"预览生成失败: {str(e)}")
-            self.error.emit(f"预览生成失败: {str(e)}")
+            self.error.emit(str(e))
         finally:
             self._is_running = False
-
-    def stop(self):
-        """停止预览生成"""
-        self._is_running = False
+            print("预览工作线程结束")
 
     def _render_document(self, doc, prefix):
         """渲染文档为图像"""
-        from PIL import Image, ImageDraw, ImageFont
-        import io
-        
-        images = {}
-        page_height = 1200  # 固定页面高度
-        page_width = int(page_height * 0.7)  # A4纸比例
-        
-        # 设置更大的字体大小和行间距
-        font_size = 16
-        line_height = int(font_size * 1.5)  # 1.5倍行间距
-        margin_top = 80
-        margin_bottom = 80
-        margin_left = 80
-        margin_right = 80
-        
         try:
-            # 尝试加载多个字体
-            for font_name in ["simsun.ttc", "simhei.ttf", "msyh.ttc", "arial.ttf"]:
-                try:
-                    font = ImageFont.truetype(font_name, font_size)
-                    break
-                except:
-                    continue
-            else:
+            from PIL import Image, ImageDraw, ImageFont
+            import io
+            
+            images = {}
+            page_height = 1200
+            page_width = int(page_height * 0.7)
+            
+            # 设置字体和布局参数
+            font_size = 14  # 减小字体大小
+            line_height = int(font_size * 1.5)
+            margin_top = 60
+            margin_bottom = 60
+            margin_left = 60
+            margin_right = 60
+            
+            # 加载字体
+            try:
                 font = ImageFont.load_default()
-                font_size = 12
-                line_height = 16
-        except:
-            font = ImageFont.load_default()
-            font_size = 12
-            line_height = 16
-        
-        current_page = Image.new('RGB', (page_width, page_height), 'white')
-        draw = ImageDraw.Draw(current_page)
-        y_position = margin_top
-        page_num = 0
-        
-        # 添加页眉
-        header_text = "原始文档" if prefix == "original" else "格式化预览"
-        draw.text((margin_left, 30), header_text, font=font, fill='gray')
-        
-        total_paragraphs = len(doc.paragraphs)
-        for i, para in enumerate(doc.paragraphs):
-            text = para.text.strip()
-            if not text:  # 跳过空段落，但添加一定间距
+                for font_name in ["simsun.ttc", "simhei.ttf", "msyh.ttc", "arial.ttf"]:
+                    try:
+                        test_font = ImageFont.truetype(font_name, font_size)
+                        font = test_font
+                        break
+                    except:
+                        continue
+            except Exception as e:
+                print(f"加载字体失败，使用默认字体: {str(e)}")
+            
+            current_page = Image.new('RGB', (page_width, page_height), 'white')
+            draw = ImageDraw.Draw(current_page)
+            y_position = margin_top
+            page_num = 0
+            
+            # 添加页眉
+            header_text = "原始文档" if prefix == "original" else "格式化预览"
+            draw.text((margin_left, 20), header_text, font=font, fill='gray')
+            
+            # 处理段落
+            total_paragraphs = len(doc.paragraphs)
+            for i, para in enumerate(doc.paragraphs):
+                if not self._is_running:
+                    return images
+                
+                text = para.text.strip()
+                if not text:
+                    y_position += line_height // 2
+                    continue
+                
+                # 计算文本布局
+                text_width = page_width - margin_left - margin_right
+                wrapped_text = self._wrap_text(text, font, text_width)
+                para_height = len(wrapped_text) * line_height
+                
+                # 检查是否需要新页面
+                if y_position + para_height > page_height - margin_bottom:
+                    self._add_page_number(draw, page_num + 1, page_width, page_height, font)
+                    images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
+                    
+                    # 创建新页面
+                    current_page = Image.new('RGB', (page_width, page_height), 'white')
+                    draw = ImageDraw.Draw(current_page)
+                    y_position = margin_top
+                    page_num += 1
+                    
+                    # 添加页眉
+                    draw.text((margin_left, 20), header_text, font=font, fill='gray')
+                
+                # 绘制文本
+                for line in wrapped_text:
+                    draw.text((margin_left, y_position), line, font=font, fill='black')
+                    y_position += line_height
+                
                 y_position += line_height // 2
-                continue
+                self.progress.emit(int((i + 1) * 100 / total_paragraphs))
             
-            # 计算文本宽度和换行
-            text_width = page_width - margin_left - margin_right
-            wrapped_text = self._wrap_text(text, font, text_width)
-            
-            # 计算段落总高度
-            para_height = len(wrapped_text) * line_height
-            
-            # 检查是否需要新页面
-            if y_position + para_height > page_height - margin_bottom:
-                # 添加页码
-                page_number_text = f"- {page_num + 1} -"
-                w = draw.textlength(page_number_text, font=font)
-                draw.text((page_width/2 - w/2, page_height - 50), 
-                         page_number_text, font=font, fill='gray')
-                
-                # 保存当前页面
+            # 保存最后一页
+            if y_position > margin_top:
+                self._add_page_number(draw, page_num + 1, page_width, page_height, font)
                 images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
-                page_num += 1
-                
-                # 创建新页面
-                current_page = Image.new('RGB', (page_width, page_height), 'white')
-                draw = ImageDraw.Draw(current_page)
-                y_position = margin_top
-                
-                # 添加页眉
-                draw.text((margin_left, 30), header_text, font=font, fill='gray')
             
-            # 绘制文本
-            for line in wrapped_text:
-                draw.text((margin_left, y_position), line, font=font, fill='black')
-                y_position += line_height
+            return images
             
-            # 段落间距
-            y_position += line_height // 2
-            
-            # 更新进度
-            self.progress.emit(int((i + 1) * 100 / total_paragraphs))
-        
-        # 保存最后一页
-        if y_position > margin_top:
-            # 添加页码
-            page_number_text = f"- {page_num + 1} -"
+        except Exception as e:
+            print(f"渲染文档失败: {str(e)}")
+            raise e
+
+    def _add_page_number(self, draw, page_num, page_width, page_height, font):
+        """添加页码"""
+        try:
+            page_number_text = f"- {page_num} -"
             w = draw.textlength(page_number_text, font=font)
-            draw.text((page_width/2 - w/2, page_height - 50), 
+            draw.text((page_width/2 - w/2, page_height - 40), 
                      page_number_text, font=font, fill='gray')
-            
-            images[f"{prefix}_{page_num}"] = self._convert_pil_to_qpixmap(current_page)
-        
-        return images
+        except:
+            # 如果页码添加失败，忽略错误继续执行
+            pass
 
     def _wrap_text(self, text, font, max_width):
         """将文本按宽度换行"""
@@ -440,11 +460,6 @@ class PreviewPage(QWidget):
         """更新预览内容"""
         if not self.main_window.document:
             return
-            
-        # 如果有正在运行的预览任务，先停止它
-        if self.preview_worker and self.preview_worker.isRunning():
-            self.preview_worker.stop()
-            self.preview_worker.wait()
         
         try:
             # 显示加载指示器
@@ -454,6 +469,11 @@ class PreviewPage(QWidget):
             original_docx = self.temp_manager.get_temp_path("original.docx")
             formatted_docx = self.temp_manager.get_temp_path("formatted.docx")
             
+            # 确保目录存在
+            import os
+            os.makedirs(os.path.dirname(original_docx), exist_ok=True)
+            os.makedirs(os.path.dirname(formatted_docx), exist_ok=True)
+            
             # 复制和格式化文档
             try:
                 # 直接使用python-docx打开原始文档
@@ -461,8 +481,8 @@ class PreviewPage(QWidget):
                 
                 # 打开原始文档
                 try:
+                    # 先保存原始文档
                     original_doc = Document(self.main_window.document.path)
-                    # 保存为新文件
                     original_doc.save(original_docx)
                     print("原始文档保存成功")
                     
@@ -480,23 +500,40 @@ class PreviewPage(QWidget):
                     
                 except Exception as e:
                     print(f"文档处理失败: {str(e)}")
-                    raise Exception(f"文档处理失败: {str(e)}")
+                    self.main_window.show_message(f"文档处理失败: {str(e)}", error=True)
+                    return
                     
             except Exception as e:
                 print(f"准备预览文档失败: {str(e)}")
-                raise Exception(f"准备预览文档失败: {str(e)}")
+                self.main_window.show_message(f"准备预览文档失败: {str(e)}", error=True)
+                return
             
-            # 创建并启动预览工作线程
-            self.preview_worker = PreviewWorker(original_docx, formatted_docx)
-            self.preview_worker.progress.connect(self.update_progress)
-            self.preview_worker.finished.connect(self.show_preview_images)
-            self.preview_worker.error.connect(self.handle_preview_error)
-            self.preview_worker.start()
+            # 如果有正在运行的预览任务，先停止它
+            if hasattr(self, 'preview_worker') and self.preview_worker and self.preview_worker.isRunning():
+                try:
+                    self.preview_worker.stop()
+                    self.preview_worker.wait()
+                except Exception as e:
+                    print(f"停止旧预览任务失败: {str(e)}")
+            
+            try:
+                # 创建并启动预览工作线程
+                self.preview_worker = PreviewWorker(original_docx, formatted_docx)
+                self.preview_worker.progress.connect(self.update_progress)
+                self.preview_worker.finished.connect(self.show_preview_images)
+                self.preview_worker.error.connect(self.handle_preview_error)
+                self.preview_worker.start()
+                
+            except Exception as e:
+                error_msg = f"启动预览任务失败: {str(e)}"
+                print(error_msg)
+                self.main_window.show_message(error_msg, error=True)
             
         except Exception as e:
             error_msg = f"预览失败: {str(e)}"
             print(error_msg)
             self.main_window.show_message(error_msg, error=True)
+            self.clear_loading_indicators()
     
     def show_loading_indicators(self):
         """显示加载指示器"""
